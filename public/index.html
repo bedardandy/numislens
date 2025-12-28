@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Numislens - AI Coin Identifier</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/styles/main.css">
+    <link rel="icon" href="/icons/icon-192x192.png" type="image/png">
+    <meta name="theme-color" content="#2196f3">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Numislens</h1>
+            <p>AI-Powered Coin Identification & Grading</p>
+        </header>
+        
+        <main>
+            <section id="upload-section">
+                <h2>Identify Your Coin</h2>
+                <p>Upload images of the front and edge of your coin for AI analysis</p>
+                
+                <div class="image-upload-container">
+                    <div class="upload-area" id="front-upload">
+                        <div class="upload-content">
+                            <span class="upload-icon">📷</span>
+                            <p>Front of Coin</p>
+                            <button class="upload-btn" id="front-camera-btn">Take Photo</button>
+                            <button class="upload-btn" id="front-file-btn">Upload Image</button>
+                            <input type="file" id="front-input" accept="image/*" capture="environment" style="display: none;">
+                        </div>
+                        <img id="front-preview" style="display: none;" alt="Front preview">
+                    </div>
+                    
+                    <div class="upload-area" id="edge-upload">
+                        <div class="upload-content">
+                            <span class="upload-icon">📷</span>
+                            <p>Edge of Coin</p>
+                            <button class="upload-btn" id="edge-camera-btn">Take Photo</button>
+                            <button class="upload-btn" id="edge-file-btn">Upload Image</button>
+                            <input type="file" id="edge-input" accept="image/*" capture="environment" style="display: none;">
+                        </div>
+                        <img id="edge-preview" style="display: none;" alt="Edge preview">
+                    </div>
+                </div>
+                
+                <button id="analyze-btn" disabled>Analyze Coin</button>
+            </section>
+            
+            <section id="results-section" style="display: none;">
+                <h2>Analysis Results</h2>
+                <div id="results-content">
+                    <div class="result-card">
+                        <h3>Coin Identification</h3>
+                        <p id="coin-name">-</p>
+                    </div>
+                    
+                    <div class="result-card">
+                        <h3>Condition Grade</h3>
+                        <p id="coin-grade">-</p>
+                    </div>
+                    
+                    <div class="result-card">
+                        <h3>Estimated Value</h3>
+                        <p id="coin-value">-</p>
+                    </div>
+                    
+                    <div class="result-card">
+                        <h3>Additional Details</h3>
+                        <p id="coin-details">-</p>
+                    </div>
+                </div>
+                
+                <button id="new-analysis-btn">Analyze Another Coin</button>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Powered by AI • Works offline • Secure & Private</p>
+        </footer>
+    </div>
+    
+    <!-- Load utility scripts -->
+    <script src="/js/aiService.js"></script>
+    <script src="/js/gradingSystem.js"></script>
+    <script src="/js/valueEstimation.js"></script>
+    <script src="/js/imageProcessor.js"></script>
+
+    <script src="/js/app.js"></script>
+    <script>
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered'))
+                    .catch(error => console.log('SW registration failed'));
+            });
+        }
+    </script>
+</body>
+</html>
