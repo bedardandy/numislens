@@ -1,9 +1,14 @@
 // Service Worker for Numislens PWA
-const CACHE_NAME = 'numislens-v1';
+const CACHE_NAME = 'numislens-v2';
 const urlsToCache = [
   '/',
   '/index.html',
   '/styles/main.css',
+  '/js/config.js',
+  '/js/aiService.js',
+  '/js/gradingSystem.js',
+  '/js/valueEstimation.js',
+  '/js/imageProcessor.js',
   '/js/app.js',
   '/manifest.json',
   '/icons/icon-72x72.png',

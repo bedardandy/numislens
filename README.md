@@ -64,12 +64,12 @@ The application is designed to work with an OpenAI-compatible API, specifically 
    ./server -m your-vision-model.gguf --port 8080 --chat-template llama3 -c 4096
    ```
 
-2. Update the API endpoint in `public/js/aiService.js` if using a different port:
+2. Update the API endpoint in `public/js/config.js` if using a different port:
    ```javascript
-   this.apiEndpoint = 'http://localhost:8080/v1/chat/completions';
+   apiEndpoint: 'http://localhost:8080/v1/chat/completions',
    ```
 
-3. The application uses the default llama.cpp API key ('sk-llama') which can be changed in the configuration.
+3. The application uses the default llama.cpp API key ('sk-llama'), set in `public/js/config.js`, which can be changed there.
 
 4. Ensure your model supports image inputs (like LLaVA, Phi-3 Vision, etc.)
 
@@ -83,13 +83,14 @@ The application is designed to work with an OpenAI-compatible API, specifically 
 ## Components
 
 - `public/index.html` - Main application structure
+- `public/js/config.js` - Central configuration (endpoint, model, key, timeout)
 - `public/js/app.js` - Core application logic
+- `public/js/aiService.js` - AI integration layer
+- `public/js/gradingSystem.js` - Coin grading algorithms
+- `public/js/valueEstimation.js` - Value calculation algorithms
+- `public/js/imageProcessor.js` - Image processing functions
 - `public/styles/main.css` - Styling
 - `public/sw.js` - Service worker for PWA features
-- `src/utils/aiService.js` - AI integration layer
-- `src/utils/gradingSystem.js` - Coin grading algorithms
-- `src/utils/valueEstimation.js` - Value calculation algorithms
-- `src/utils/imageProcessor.js` - Image processing functions
 
 ## Testing
 

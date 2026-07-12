@@ -3,11 +3,11 @@
 
 class CoinAIService {
     constructor() {
-        // Configuration for local llama.cpp server
-        this.apiEndpoint = 'http://localhost:8080/v1/chat/completions'; // Default llama.cpp endpoint
-        this.modelName = 'qwenVL3-30B3A'; // Model name for the API
-        this.apiKey = 'sk-llama'; // Default key for local llama.cpp
-        this.timeout = 30000; // 30 seconds timeout
+        const cfg = (typeof NumislensConfig !== 'undefined' && NumislensConfig) || (typeof window !== 'undefined' && window.NumislensConfig) || {};
+        this.apiEndpoint = cfg.apiEndpoint || 'http://localhost:8080/v1/chat/completions';
+        this.modelName = cfg.modelName || 'qwenVL3-30B3A';
+        this.apiKey = cfg.apiKey || 'sk-llama';
+        this.timeout = cfg.timeout || 30000;
     }
 
     async identifyCoin(frontImage, edgeImage) {
