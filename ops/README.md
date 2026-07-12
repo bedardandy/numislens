@@ -68,3 +68,58 @@ cp ops/systemd/numislens-daemon.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now numislens-daemon
 ```
+
+## Assistant surfaces (Phase 2b)
+
+The `surfaces/` directory holds thin assistant skins over the daemon's REST API
+(see `surfaces/README.md`). The Claude MCP server is installed separately from
+the daemon; it is a pure REST client and talks to the daemon over HTTP with the
+same bearer token.
+
+### Install the MCP server
+
+```bash
+python3 -m venv surfaces/mcp/.venv && . surfaces/mcp/.venv/bin/activate
+pip install -e surfaces/mcp          # console script: numislens-mcp
+```
+
+The MCP server reads two environment variables:
+
+- `NUMISLENS_URL` — daemon base URL (default `http://127.0.0.1:8471`; set it to
+  wherever the daemon actually listens, e.g. `http://127.0.0.1:8000` or your
+  `tailscale serve` URL).
+- `NUMISLENS_TOKEN` — the same bearer token the daemon uses (required; the
+  server exits with a clear message if it is unset).
+
+### Wire it into Claude Code (`.mcp.json`)
+
+Add a `numislens` entry to the project's `.mcp.json` (or run it via
+`claude mcp add`). Template stanza in `surfaces/mcp/mcp-config.example.json`:
+
+```json
+{
+  "mcpServers": {
+    "numislens": {
+      "command": "numislens-mcp",
+      "args": [],
+      "env": {
+        "NUMISLENS_URL": "http://127.0.0.1:8471",
+        "NUMISLENS_TOKEN": "REPLACE_WITH_DAEMON_TOKEN"
+      }
+    }
+  }
+}
+```
+
+### Wire it into Claude Desktop
+
+Add the same `mcpServers.numislens` stanza to `claude_desktop_config.json`
+(macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`) and
+restart Claude Desktop. Use the absolute path to the `numislens-mcp` console
+script (inside `surfaces/mcp/.venv/bin/`) if it is not on Claude Desktop's PATH.
+
+### Claude skill
+
+`surfaces/claude/SKILL.md` is a Claude Code skill teaching the operating rules
+(melt via tools not arithmetic, integer-cents money, confirm year+mintmark,
+no fabricated grades/values). Install it under your Claude skills directory.

@@ -7,6 +7,7 @@ Numislens is a Progressive Web Application (PWA) that uses AI to identify and gr
 - **`core/`** — the collection ledger: a dependency-free Python package (`numislens_core`) over a single SQLite database, plus its data (SQL migrations, the compositions seed, and set manifests in `core/sets/`). This is the source of truth for the whole platform. Run its tests with `cd core && python3 -m pytest`.
 - **`daemon/`** — FastAPI REST + OpenAPI surface, bearer auth, label PDFs.
 - **`ops/`** — operational files: user-level systemd units for the daily melt update, plus Litestream and dump-based backup config. See `ops/README.md` and `ops/BACKUP.md`. Nothing here is installed or enabled automatically.
+- **`surfaces/`** — thin assistant skins over the REST API: a Claude MCP server (`surfaces/mcp/`) and a Claude Code skill (`surfaces/claude/SKILL.md`), with more (ChatGPT Action, Gemini, Siri) planned. Each is a client of the daemon's OpenAPI surface — no business logic. See `surfaces/README.md`.
 - **`public/`** — the existing vanilla-JS PWA. It is slated for a thin rebuild against the core API in a later phase; treat it as legacy for now.
 
 ### Core CLI quickstart
