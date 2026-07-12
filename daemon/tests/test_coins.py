@@ -55,6 +55,22 @@ def test_find_by_series(
     assert none_series.json() == []
 
 
+def test_list_compositions(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.get("/api/v1/compositions", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body
+    expected_keys = {"id", "name", "metal", "fineness", "precious_weight_ozt"}
+    for item in body:
+        assert set(item.keys()) == expected_keys
+
+    unauth = client.get("/api/v1/compositions")
+    assert unauth.status_code == 401
+
+
 def test_get_unknown_coin_404(client: TestClient, auth_headers: dict[str, str]) -> None:
     response = client.get("/api/v1/coins/NL-999999", headers=auth_headers)
     assert response.status_code == 404

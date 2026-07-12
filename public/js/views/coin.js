@@ -7,27 +7,13 @@ import {
 } from '../api.js';
 import { toast } from '../app.js';
 import { navigate } from '../router.js';
+import { flattenLocationTree, populateLocationSelect } from '../tree.js';
 
 const EM_DASH = '\u2014';
 
 function display(value) {
   if (value == null || value === '') return EM_DASH;
   return String(value);
-}
-
-/** Flatten {tree:[{id,kind,label,children},...]} into Map<location_id, full path>. */
-function flattenLocationTree(nodes, parentPath = '') {
-  const map = new Map();
-  for (const node of nodes) {
-    const path = parentPath ? `${parentPath} > ${node.label}` : node.label;
-    map.set(node.id, path);
-    if (node.children?.length) {
-      for (const [id, childPath] of flattenLocationTree(node.children, path)) {
-        map.set(id, childPath);
-      }
-    }
-  }
-  return map;
 }
 
 function addDetailRow(dl, label, value) {
@@ -201,18 +187,10 @@ export async function renderCoin(el, accession) {
       return;
     }
 
-    moveSelect.replaceChildren();
     try {
       const data = await locationTree();
       const paths = data?.tree ? flattenLocationTree(data.tree) : new Map();
-      const entries = [...paths.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-      for (const [id, path] of entries) {
-        const opt = document.createElement('option');
-        opt.value = String(id);
-        opt.textContent = path;
-        if (coin.location_id != null && id === coin.location_id) opt.selected = true;
-        moveSelect.appendChild(opt);
-      }
+      populateLocationSelect(moveSelect, paths, { selectedId: coin.location_id });
       movePicker.style.display = 'flex';
     } catch (err) {
       toast(err.message, 'error');

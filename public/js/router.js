@@ -2,6 +2,7 @@ function parseHash(hash) {
   const path = (hash || '').replace(/^#/, '') || '/';
   if (path === '/' || path === '') return { name: 'inventory', params: {} };
   if (path === '/settings') return { name: 'settings', params: {} };
+  if (path === '/add') return { name: 'add', params: {} };
   const m = path.match(/^\/coin\/(.+)$/);
   if (m) return { name: 'coin', params: { accession: decodeURIComponent(m[1]) } };
   return { name: 'inventory', params: {} };

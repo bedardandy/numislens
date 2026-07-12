@@ -270,6 +270,16 @@ class Ledger:
 
         return [dict(row) for row in rows]
 
+    def list_compositions(self) -> list[dict]:
+        rows = self.conn.execute(
+            """
+            SELECT id, name, metal, fineness, precious_weight_ozt
+            FROM compositions
+            ORDER BY id
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def create_location(self, kind: str, label: str, parent: int | None = None) -> int:
         if parent is not None:
             self._verify_location(parent)

@@ -134,6 +134,21 @@ def test_find_coins_by_location_subtree(ledger):
     assert in_leaf_only[0]["location_id"] == slot
 
 
+def test_list_compositions(ledger):
+    compositions = ledger.list_compositions()
+    assert compositions
+    expected_keys = {"id", "name", "metal", "fineness", "precious_weight_ozt"}
+    for item in compositions:
+        assert set(item.keys()) == expected_keys
+    ids = [item["id"] for item in compositions]
+    assert len(ids) == len(set(ids))
+    assert ids == sorted(ids)
+    assert any(
+        c["name"] == "90% silver dollar" and c["metal"] == "XAG"
+        for c in compositions
+    )
+
+
 def test_create_location_and_location_path(ledger):
     cabinet = ledger.create_location("cabinet", "Cabinet A")
     box = ledger.create_location("box", "Box B2", parent=cabinet)

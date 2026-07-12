@@ -3,6 +3,7 @@ import { initRouter, navigate } from './router.js';
 import { renderSettings } from './views/settings.js';
 import { renderInventory } from './views/inventory.js';
 import { renderCoin } from './views/coin.js';
+import { renderAdd } from './views/add.js';
 
 const TOAST_DURATIONS = { error: 8000, info: 4000, success: 4000 };
 let toastRegion = null;
@@ -41,6 +42,7 @@ export function toast(message, kind = 'info') {
 
 const NAV_ITEMS = [
   { id: 'inventory', label: 'Inventory', hash: '#/', route: 'inventory' },
+  { id: 'add', label: 'Add', hash: '#/add', route: 'add' },
   { id: 'sets', label: 'Sets', disabled: true },
   { id: 'melt', label: 'Melt', disabled: true },
   { id: 'settings', label: 'Settings', hash: '#/settings', route: 'settings' },
@@ -160,6 +162,9 @@ function onRoute(route) {
   switch (route.name) {
     case 'inventory':
       renderInventory(viewEl);
+      break;
+    case 'add':
+      renderAdd(viewEl);
       break;
     case 'coin':
       renderCoin(viewEl, route.params.accession);

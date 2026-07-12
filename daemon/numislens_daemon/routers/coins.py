@@ -60,6 +60,11 @@ def list_coins(
     return [serialize_coin(c) for c in results]
 
 
+@router.get("/compositions", tags=["coins"])
+def get_compositions(ldb: LedgerDep) -> list[dict]:
+    return ldb.list_compositions()
+
+
 @router.get("/coins/{accession}", tags=["coins"])
 def get_coin(accession: str, ldb: LedgerDep) -> dict | None:
     coin = ldb.get_coin(accession)

@@ -77,6 +77,21 @@ export async function fetchBlob(path) {
   return response.blob();
 }
 
+export async function apiUpload(path, formData) {
+  let response;
+  try {
+    response = await fetch(path, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData,
+    });
+  } catch {
+    networkError();
+  }
+  if (!response.ok) await throwApiError(response);
+  return response.json();
+}
+
 export function health() {
   return apiFetch('/api/v1/health');
 }
@@ -92,6 +107,23 @@ export function listCoins(params = {}) {
 
 export function getCoin(accession) {
   return apiFetch(`/api/v1/coins/${encodeURIComponent(accession)}`);
+}
+
+export function listCompositions() {
+  return apiFetch('/api/v1/compositions');
+}
+
+export function createCoin(body) {
+  return apiFetch('/api/v1/coins', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function uploadCoinImage(accession, kind, blob, filename) {
+  const fd = new FormData();
+  fd.append(kind, blob, filename || (kind + '.jpg'));
+  return apiUpload('/api/v1/coins/' + encodeURIComponent(accession) + '/images', fd);
 }
 
 export function moveCoin(accession, locationId) {
