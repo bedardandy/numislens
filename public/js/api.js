@@ -104,3 +104,7 @@ export function moveCoin(accession, locationId) {
 export function locationTree() {
   return apiFetch('/api/v1/locations/tree');
 }
+
+export function getLocation(locationId) {
+  return apiFetch(`/api/v1/locations/${encodeURIComponent(locationId)}`);
+}

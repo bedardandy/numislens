@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import require_token
@@ -55,6 +56,15 @@ def create_app(
     register_error_handlers(app)
 
     public = Path(__file__).resolve().parents[2] / "public"
+
+    # QR labels encode numislens://c/<accession>; the PWA owns a /c/<accession>
+    # deep-link route. StaticFiles(html=True) 404s on this virtual path, so
+    # serve the SPA shell here and let the client-side router redirect to
+    # #/coin/<accession>. Registered before the "/" mount so it wins.
+    @app.get("/c/{accession}", include_in_schema=False)
+    def deep_link(accession: str) -> FileResponse:
+        return FileResponse(public / "index.html")
+
     app.mount("/", StaticFiles(directory=public, html=True), name="static")
 
     return app

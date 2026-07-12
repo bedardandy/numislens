@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from numislens_core import Ledger
 
 from ..deps import get_ledger
@@ -64,7 +65,35 @@ def get_coin(accession: str, ldb: LedgerDep) -> dict | None:
     coin = ldb.get_coin(accession)
     if coin is None:
         raise HTTPException(status_code=404, detail=f"coin not found: {accession}")
-    return serialize_coin(coin)
+    result = serialize_coin(coin)
+    # Expose image metadata (kind + content_hash) so the PWA can build image
+    # URLs; the on-disk path is intentionally NOT leaked to clients.
+    result["coin_images"] = [
+        {"kind": img["kind"], "content_hash": img["content_hash"]}
+        for img in ldb.list_images(accession)
+    ]
+    return result
+
+
+@router.get("/coins/{accession}/images/{content_hash}", tags=["coins"])
+def get_coin_image(
+    accession: str, content_hash: str, ldb: LedgerDep
+) -> FileResponse:
+    # list_images raises CoinNotFound (-> 404) if the coin is unknown.
+    images = ldb.list_images(accession)
+    match = next(
+        (img for img in images if img["content_hash"] == content_hash), None
+    )
+    if match is None:
+        raise HTTPException(
+            status_code=404, detail=f"image not found: {content_hash}"
+        )
+    path = Path(match["path"])
+    if not path.is_file():
+        raise HTTPException(
+            status_code=404, detail=f"image file missing on disk: {content_hash}"
+        )
+    return FileResponse(path)
 
 
 @router.post("/coins/{accession}/move", tags=["coins"])
