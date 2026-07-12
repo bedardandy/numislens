@@ -1195,6 +1195,106 @@
           }
         ]
       }
+    },
+    "/api/v1/watch/status": {
+      "get": {
+        "tags": [
+          "watch"
+        ],
+        "summary": "Watch Status",
+        "description": "Value-watch snapshot: stale coins, the top-value watchlist, spot deltas.\n\n``n`` bounds the watchlist (top coins by ``value_est_cents``). The ``stale``\nlist is capped at 100 entries; ``stale_count`` is the true total.",
+        "operationId": "watch_status_api_v1_watch_status_get",
+        "parameters": [
+          {
+            "name": "n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 25,
+              "title": "N"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Watch Status Api V1 Watch Status Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/watch/digest": {
+      "post": {
+        "tags": [
+          "watch"
+        ],
+        "summary": "Submit Digest",
+        "description": "Deterministic sink for a weekly market digest — mark coins stale in bulk.\n\nEach item names EXACTLY ONE target (series, set_id, or accessions) plus a\nreason; the daemon marks the matching coins stale and reports the per-item\nmatched-coin count. This never changes any value — it only flags coins for a\nlater lazy re-appraisal.\n\nFail-loud contract: an unknown series returns HTTP 422 with the list of\nseries that DO exist (nothing is marked). An item that does not name exactly\none target is also a 422. Do not mark stale on a hunch — cite a source_note.",
+        "operationId": "submit_digest_api_v1_watch_digest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DigestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Submit Digest Api V1 Watch Digest Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1570,6 +1670,87 @@
         "additionalProperties": false,
         "type": "object",
         "title": "CoinCreate"
+      },
+      "DigestBody": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DigestItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Distilled findings; each marks its target coins stale."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "DigestBody"
+      },
+      "DigestItem": {
+        "properties": {
+          "series": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
+          },
+          "set_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Id"
+          },
+          "accessions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accessions"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why these coins may have moved (required)."
+          },
+          "source_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Note",
+            "description": "Citation for the finding (headline, auction record, URL)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "DigestItem"
       },
       "HTTPValidationError": {
         "properties": {

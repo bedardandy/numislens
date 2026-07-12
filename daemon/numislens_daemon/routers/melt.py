@@ -28,12 +28,18 @@ def update_melt(ldb: LedgerDep) -> dict:
             errors[metal] = str(exc)
 
     summary = melt.update_melt_values(ldb.conn)
+    newly_stale = [s for s in summary["stale_marked"] if s.get("newly")]
+    # Optional keyless push (NUMISLENS_NTFY_URL); no-op when unset, and a
+    # notifier failure is logged-not-fatal (never blocks this response).
+    notified = melt.push_notification(ldb.conn, summary)
     return {
         "recorded": recorded,
         "errors": errors,
         "updated": len(summary["updated"]),
         "hybrid_floors": len(summary["hybrid_floors"]),
         "skipped_no_spot": len(summary["skipped_no_spot"]),
+        "stale_marked": len(newly_stale),
+        "notified": notified is not None,
     }
 
 

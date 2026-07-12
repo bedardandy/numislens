@@ -320,6 +320,14 @@ def cmd_melt_update(path: Path) -> int:
                 print(f"hybrid floors: {len(summary['hybrid_floors'])}")
             if summary["skipped_no_spot"]:
                 print(f"skipped (no spot): {len(summary['skipped_no_spot'])}")
+            newly_stale = [s for s in summary["stale_marked"] if s.get("newly")]
+            if newly_stale:
+                print(f"marked stale (spot moved >=10%): {len(newly_stale)}")
+            # Optional keyless push (NUMISLENS_NTFY_URL); no-op when unset,
+            # logged-not-fatal on failure.
+            sent = melt.push_notification(ldb.conn, summary)
+            if sent is not None:
+                print(f"notified: {sent}")
         finally:
             ldb.close()
         return 1 if failures else 0
@@ -389,6 +397,81 @@ def cmd_melt_status(path: Path, args: argparse.Namespace) -> int:
             print(line)
     finally:
         ldb.close()
+    return 0
+
+
+def _coin_line(coin: dict) -> str:
+    year = coin.get("year") or ""
+    mint = coin.get("mintmark") or ""
+    series = coin.get("series") or ""
+    value = _dollars(coin.get("value_est_cents"))
+    return f"{coin['accession_no']}  {year}  {mint}  {series}  {value}"
+
+
+@_cmd_error
+def cmd_watch_status(path: Path, args: argparse.Namespace) -> int:
+    ldb = _open_ledger(path)
+    try:
+        stale = ldb.list_stale()
+        watch = ldb.watchlist(args.n)
+        delta = melt.melt_delta(ldb.conn)
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "stale_count": len(stale),
+                        "watchlist": watch,
+                        "delta": delta,
+                    },
+                    indent=2,
+                    default=str,
+                )
+            )
+            return 0
+        print(f"stale coins: {len(stale)}")
+        print(f"watchlist (top {args.n} by value):")
+        for coin in watch:
+            print(f"  {_coin_line(coin)}")
+        print("Spot deltas:")
+        for metal in sorted(delta):
+            print(f"  {metal}: {delta[metal]['pct']:+.1f}%")
+    finally:
+        ldb.close()
+    return 0
+
+
+@_cmd_error
+def cmd_watch_stale(path: Path, args: argparse.Namespace) -> int:
+    ldb = _open_ledger(path)
+    try:
+        stale = ldb.list_stale()
+        if args.json:
+            print(json.dumps(stale, indent=2, default=str))
+            return 0
+        for coin in stale:
+            print(f"{_coin_line(coin)}  <- {coin.get('stale_reason') or ''}")
+        print(f"{len(stale)} stale coin(s)")
+    finally:
+        ldb.close()
+    return 0
+
+
+@_cmd_error
+def cmd_watch_mark(path: Path, args: argparse.Namespace) -> int:
+    targets = [t for t in (args.series, args.set_id, args.accession) if t]
+    if len(targets) != 1:
+        return _fail("provide exactly one of --series, --set-id, or --accession")
+    ldb = _open_ledger(path)
+    try:
+        if args.series:
+            count = ldb.mark_stale(series=args.series, reason=args.reason)
+        elif args.set_id:
+            count = ldb.mark_stale(set_id=_parse_set_id(args.set_id), reason=args.reason)
+        else:
+            count = ldb.mark_stale(accessions=args.accession, reason=args.reason)
+    finally:
+        ldb.close()
+    print(f"marked {count} coin(s) stale")
     return 0
 
 
@@ -475,6 +558,25 @@ def _build_parser() -> argparse.ArgumentParser:
     melt_status_p = melt_sub.add_parser("status", help="Show melt portfolio status")
     melt_status_p.add_argument("--json", action="store_true")
 
+    watch_p = subparsers.add_parser("watch", help="Value-watch: staleness and watchlist")
+    watch_sub = watch_p.add_subparsers(dest="watch_command", required=True)
+    watch_status_p = watch_sub.add_parser(
+        "status", help="Stale count, watchlist, and spot deltas"
+    )
+    watch_status_p.add_argument("--n", type=int, default=25, help="watchlist size")
+    watch_status_p.add_argument("--json", action="store_true")
+    watch_stale_p = watch_sub.add_parser("stale", help="List currently-stale coins")
+    watch_stale_p.add_argument("--json", action="store_true")
+    watch_mark_p = watch_sub.add_parser(
+        "mark", help="Flag coins stale (one of --series/--set-id/--accession)"
+    )
+    watch_mark_p.add_argument("--series")
+    watch_mark_p.add_argument("--set-id", dest="set_id")
+    watch_mark_p.add_argument(
+        "--accession", action="append", help="repeatable; accession to mark"
+    )
+    watch_mark_p.add_argument("--reason", required=True)
+
     return parser
 
 
@@ -512,6 +614,13 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_melt_update(path)
         if args.melt_command == "status":
             return cmd_melt_status(path, args)
+    if args.command == "watch":
+        if args.watch_command == "status":
+            return cmd_watch_status(path, args)
+        if args.watch_command == "stale":
+            return cmd_watch_stale(path, args)
+        if args.watch_command == "mark":
+            return cmd_watch_mark(path, args)
 
     parser.error(f"unknown command: {args.command}")
     return 1

@@ -19,10 +19,11 @@ def test_migrations_smoke(tmp_path):
     db_path = tmp_path / "test.db"
 
     applied = migrate(db_path)
-    assert len(applied) == 3
+    assert len(applied) == 4
     assert "001_initial.sql" in applied
     assert "002_seed_compositions.sql" in applied
     assert "003_seed_steel_cent.sql" in applied
+    assert "004_stale_columns.sql" in applied
 
     conn = __import__("sqlite3").connect(db_path)
     try:
@@ -49,6 +50,11 @@ def test_migrations_smoke(tmp_path):
             ("90% silver dollar",),
         ).fetchone()
         assert row[0] == 0.77344
+
+        coin_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(coins)").fetchall()
+        }
+        assert {"stale_since", "stale_reason"} <= coin_cols
     finally:
         conn.close()
 

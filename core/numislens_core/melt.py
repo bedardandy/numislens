@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import socket
 import sqlite3
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+
+_log = logging.getLogger(__name__)
 
 METALS = frozenset({"XAU", "XAG", "XPT"})
 GOLD_API_METAL = {"XAU": "XAU", "XAG": "XAG", "XPT": "XPT"}
@@ -18,6 +22,17 @@ CROSSCHECK_SOURCE = "yahoo"
 DISAGREE_PCT = 2.0
 STALE_HOURS = 48
 HTTP_TIMEOUT = 10
+
+# Value-watch (Phase 6) thresholds.
+# A >=10% move in the PRIMARY spot for a metal marks every hybrid/numismatic
+# coin of that metal stale (their premiums track spot; melt-basis coins just
+# reprice and need no flag). A >3% day-over-day move (or any newly-stale coin)
+# triggers the optional ntfy push. NUMISLENS_NTFY_URL is a full ntfy.sh topic
+# URL; when unset, no push is attempted.
+STALE_SPOT_PCT = 10.0
+DAILY_ALERT_PCT = 3.0
+NTFY_ENV = "NUMISLENS_NTFY_URL"
+NTFY_TIMEOUT = 5
 # Yahoo 429s the ubiquitous "Chrome/120.0.0.0" scraper UA; this shorter UA passes.
 YAHOO_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
 
@@ -237,11 +252,36 @@ def latest_spot(
     }
 
 
+def _primary_spot_move(conn: sqlite3.Connection, metal: str) -> float | None:
+    """Percent move of the latest PRIMARY spot vs the previous primary row.
+
+    Returns None when there is no prior row to compare against (first ever spot
+    for the metal) or the prior price is zero. Positive = up.
+    """
+    rows = conn.execute(
+        """
+        SELECT price_usd_cents FROM spot_prices
+        WHERE metal = ? AND source = ?
+        ORDER BY fetched_at DESC, id DESC
+        LIMIT 2
+        """,
+        (metal, PRIMARY_SOURCE),
+    ).fetchall()
+    if len(rows) < 2:
+        return None
+    latest = rows[0]["price_usd_cents"]
+    prior = rows[1]["price_usd_cents"]
+    if prior == 0:
+        return None
+    return 100.0 * (latest - prior) / prior
+
+
 def update_melt_values(conn: sqlite3.Connection) -> dict:
     updated: list[dict] = []
     hybrid_floors: list[dict] = []
     skipped_no_spot: list[str] = []
     metals_priced: dict[str, int] = {}
+    stale_marked: list[dict] = []
 
     rows = conn.execute(
         """
@@ -300,11 +340,55 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
                     }
                 )
 
+        # Spot-move staleness trigger: when a metal's primary spot moved >=10%
+        # since the previous primary row, every hybrid/numismatic coin of that
+        # metal is flagged stale (its premium tracks spot). Melt-basis coins are
+        # NOT flagged — they repriced above. Deterministic SQL, no value change.
+        for metal, spot_cents in spot_cache.items():
+            if spot_cents is None:
+                continue
+            move = _primary_spot_move(conn, metal)
+            if move is None or abs(move) < STALE_SPOT_PCT:
+                continue
+            reason = f"spot {metal} moved {move:+.1f}%"
+            affected = conn.execute(
+                """
+                SELECT accession_no, stale_since FROM coins
+                WHERE value_basis IN ('hybrid', 'numismatic')
+                  AND composition_id IN (
+                    SELECT id FROM compositions WHERE metal = ?
+                  )
+                ORDER BY accession_no
+                """,
+                (metal,),
+            ).fetchall()
+            if not affected:
+                continue
+            conn.execute(
+                """
+                UPDATE coins SET stale_since = ?, stale_reason = ?
+                WHERE value_basis IN ('hybrid', 'numismatic')
+                  AND composition_id IN (
+                    SELECT id FROM compositions WHERE metal = ?
+                  )
+                """,
+                (now, reason, metal),
+            )
+            for arow in affected:
+                stale_marked.append(
+                    {
+                        "accession": arow["accession_no"],
+                        "reason": reason,
+                        "newly": arow["stale_since"] is None,
+                    }
+                )
+
     return {
         "updated": updated,
         "hybrid_floors": hybrid_floors,
         "skipped_no_spot": skipped_no_spot,
         "metals_priced": metals_priced,
+        "stale_marked": stale_marked,
     }
 
 
@@ -364,6 +448,68 @@ def portfolio_value(conn: sqlite3.Connection) -> dict:
         "value_est_by_basis": by_basis,
         "value_est_total_cents": value_est_total_cents,
     }
+
+
+def _post_ntfy(url: str, message: str, timeout: float = NTFY_TIMEOUT) -> None:
+    request = urllib.request.Request(
+        url,
+        data=message.encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "text/plain; charset=utf-8"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        response.read()
+
+
+def build_notification(conn: sqlite3.Connection, summary: dict) -> str | None:
+    """Compose the ntfy body, or None when nothing crosses a threshold.
+
+    Triggers: any metal's day-over-day |delta| > 3% (from :func:`melt_delta`),
+    or one or more coins NEWLY marked stale by the >=10% spot-move trigger in
+    ``summary``. Pure/read-only — no network.
+    """
+    lines: list[str] = []
+    delta = melt_delta(conn)
+    for metal in sorted(delta):
+        pct = delta[metal]["pct"]
+        if abs(pct) > DAILY_ALERT_PCT:
+            lines.append(f"{metal} spot {pct:+.1f}% day-over-day")
+    newly = [s for s in summary.get("stale_marked", []) if s.get("newly")]
+    if newly:
+        lines.append(f"{len(newly)} coin(s) newly stale (spot moved >=10%)")
+    if not lines:
+        return None
+    return "NumisLens value-watch: " + "; ".join(lines)
+
+
+def push_notification(
+    conn: sqlite3.Connection,
+    summary: dict,
+    *,
+    url: str | None = None,
+) -> str | None:
+    """Send an ntfy push if configured and a threshold is crossed.
+
+    ``url`` defaults to the ``NUMISLENS_NTFY_URL`` env var (a full ntfy.sh topic
+    URL). Returns the message sent, or None (unset, or nothing to report).
+
+    A notification failure is LOGGED, never raised — a dead notifier must not
+    block the melt update or the ledger. This is the one deliberately non-fatal
+    outbound error path in core (see AGENTS.md).
+    """
+    if url is None:
+        url = os.environ.get(NTFY_ENV)
+    if not url:
+        return None
+    message = build_notification(conn, summary)
+    if message is None:
+        return None
+    try:
+        _post_ntfy(url, message)
+    except (urllib.error.URLError, socket.timeout, OSError) as exc:
+        _log.warning("ntfy notification failed (non-fatal): %s", exc)
+        return None
+    return message
 
 
 def melt_delta(conn: sqlite3.Connection, days: int = 1) -> dict:

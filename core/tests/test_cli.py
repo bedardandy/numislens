@@ -208,3 +208,58 @@ def test_melt_update_reports_failure_exit_1(tmp_path, capsys, monkeypatch):
     assert rc == 1
     _, err = capsys.readouterr()
     assert "ERROR" in err
+
+
+def test_watch_mark_and_stale(tmp_path, capsys):
+    db = tmp_path / "cli.db"
+    cli.main(["--db", str(db), "init"])
+    capsys.readouterr()
+
+    cli.main(["--db", str(db), "add", "--series", "Morgan Dollar", "--year", "1921"])
+    capsys.readouterr()
+
+    rc = cli.main(
+        ["--db", str(db), "watch", "mark", "--series", "Morgan Dollar",
+         "--reason", "silver news"]
+    )
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    assert "marked 1" in out
+
+    rc = cli.main(["--db", str(db), "watch", "stale", "--json"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    stale = json.loads(out)
+    assert len(stale) == 1
+    assert stale[0]["stale_reason"] == "silver news"
+
+
+def test_watch_mark_unknown_series_fails(tmp_path, capsys):
+    db = tmp_path / "cli.db"
+    cli.main(["--db", str(db), "init"])
+    capsys.readouterr()
+
+    rc = cli.main(
+        ["--db", str(db), "watch", "mark", "--series", "Nope", "--reason", "x"]
+    )
+    assert rc == 1
+    _, err = capsys.readouterr()
+    assert "unknown series" in err
+
+
+def test_watch_status_json(tmp_path, capsys):
+    db = tmp_path / "cli.db"
+    cli.main(["--db", str(db), "init"])
+    capsys.readouterr()
+    cli.main(
+        ["--db", str(db), "add", "--series", "Morgan Dollar", "--year", "1921",
+         "--value", "50"]
+    )
+    capsys.readouterr()
+
+    rc = cli.main(["--db", str(db), "watch", "status", "--json"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    assert data["stale_count"] == 0
+    assert len(data["watchlist"]) == 1

@@ -9,6 +9,7 @@ from .ledger import (
     MoveConflict,
     SetNotFound,
     SlotError,
+    UnknownSeries,
 )
 from .manifests import ManifestError, load_manifest, validate_manifest
 
@@ -25,6 +26,7 @@ __all__ = [
     "SetNotFound",
     "SlotError",
     "MoveConflict",
+    "UnknownSeries",
     "load_manifest",
     "validate_manifest",
     "ManifestError",

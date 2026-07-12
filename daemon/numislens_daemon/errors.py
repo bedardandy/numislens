@@ -13,6 +13,7 @@ from numislens_core import (
     MoveConflict,
     SetNotFound,
     SlotError,
+    UnknownSeries,
 )
 from numislens_core.melt import SpotError
 
@@ -57,6 +58,20 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(MoveConflict)
     async def move_conflict_handler(request: Request, exc: MoveConflict) -> JSONResponse:
         return JSONResponse(status_code=409, content={'detail': str(exc)})
+
+    @app.exception_handler(UnknownSeries)
+    async def unknown_series_handler(
+        request: Request, exc: UnknownSeries
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": {
+                    "message": f"unknown series {exc.series!r}",
+                    "known_series": exc.known,
+                }
+            },
+        )
 
     @app.exception_handler(LedgerError)
     async def ledger_error_handler(

@@ -30,7 +30,7 @@ numislens/
 │   │   ├── manifests.py           # set-manifest load/validate
 │   │   ├── melt.py                # keyless dual-source spot fetch + melt recompute
 │   │   └── cli.py                 # `numislens` console script
-│   ├── migrations/                # 001_initial, 002_seed_compositions, 003_seed_steel_cent
+│   ├── migrations/                # 001_initial … 004_stale_columns (value-watch)
 │   ├── sets/                      # set manifests (JSON) + manifest.schema.json
 │   └── tests/                     # pytest: cli, ledger, manifests, melt, migrations_smoke
 ├── daemon/                        # FastAPI REST + OpenAPI + bearer auth
@@ -44,7 +44,7 @@ numislens/
 │   │   ├── schemas.py             # Pydantic request bodies (extra="forbid")
 │   │   ├── serializers.py         # pure response shaping (adds *_display)
 │   │   ├── labels.py              # QR label-sheet PDF rendering
-│   │   └── routers/               # coins, locations, sets, melt, labels
+│   │   └── routers/               # coins, locations, sets, melt, labels, watch
 │   └── tests/                     # pytest: auth, coins, images, labels, locations, melt, quickadd, sets, validation
 ├── surfaces/                      # thin assistant skins over the REST API
 │   ├── openapi.json               # generated spec (regen: scripts/export_openapi.py)
@@ -69,6 +69,10 @@ numislens/
    default for a fact you were not given. On missing data, surface it (an
    `unresolved` list, a 422, an OFFLINE banner) — do not guess. The deleted
    `generateFallbackResponse` (random coin on API failure) is the anti-pattern.
+   **One deliberate exception:** the optional ntfy push (`NUMISLENS_NTFY_URL`,
+   `melt.push_notification`) logs-not-raises on failure — a dead notifier must
+   never block the melt update or the ledger. It is the only non-fatal outbound
+   error path, and the only outbound call besides the two spot sources.
 2. **Grade is never inferred.** `grade_bucket` is set only from a photo pipeline
    or a human/TPG appraisal, never parsed from text or guessed.
 3. **Composition only when numismatically certain.** See `quickadd.py`
@@ -81,7 +85,10 @@ numislens/
    float.
 5. **Append-only history.** `events` and `appraisals` are append-only ledgers —
    the audit trail *is* the provenance. Add rows; never overwrite or delete them.
-   Moves, adds, and appraisals all write an `events` row.
+   Moves, adds, and appraisals all write an `events` row. Value-watch staleness
+   (`coins.stale_since`/`stale_reason`) is transient METADATA, not history: it
+   never changes `value_est_cents`, and `record_appraisal` clears it atomically
+   with the appraisal insert.
 6. **Zero-dependency core.** `numislens_core` imports only the Python stdlib
    (sqlite3, urllib, etc.). Do not add third-party runtime deps to `core/`. The
    quick-add parser is stdlib regex only.
@@ -106,9 +113,9 @@ numislens/
 Run all three before committing anything that touches their area:
 
 ```bash
-cd core            && python3 -m pytest -q     # 65 tests
-cd daemon          && python3 -m pytest -q     # 63 tests
-cd surfaces/mcp    && python3 -m pytest -q     # 18 tests (needs its own venv)
+cd core            && python3 -m pytest -q     # 88 tests
+cd daemon          && python3 -m pytest -q     # 76 tests
+cd surfaces/mcp    && python3 -m pytest -q     # 22 tests (needs its own venv)
 node --test tests/js/                           # PWA money helper
 python3 scripts/e2e_smoke.py                    # scratch daemon + temp DB, boots nothing external
 python3 scripts/check_sw_files.py               # sw.js precache list vs files on disk
@@ -136,4 +143,4 @@ own package/venv (`pip install -e surfaces/mcp`). A bearer token must be set
 - Architecture, phase plan, security, value-watch etiquette:
   `NUMISLENS-DIRECTION-2026-07-12.md` (Gitea workspace root).
 - Regenerate the OpenAPI artifact after any route/schema change:
-  `python3 scripts/export_openapi.py` (asserts 21 `/api/v1` paths, all secured).
+  `python3 scripts/export_openapi.py` (asserts 24 `/api/v1` paths, all secured).

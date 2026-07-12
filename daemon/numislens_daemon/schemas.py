@@ -67,6 +67,27 @@ class AppraiseBody(StrictModel):
     confidence: Optional[float] = None
 
 
+class DigestItem(StrictModel):
+    # A single distilled market-digest finding. Provide EXACTLY ONE target:
+    # series (case-insensitive exact match), set_id (id or set_key), or an
+    # explicit accessions list. reason is required; source_note carries the
+    # citation (headline/auction/URL) and is folded into the stored reason.
+    series: Optional[str] = None
+    set_id: Optional[str] = None
+    accessions: Optional[list[str]] = None
+    reason: str = Field(description="Why these coins may have moved (required).")
+    source_note: Optional[str] = Field(
+        default=None,
+        description="Citation for the finding (headline, auction record, URL).",
+    )
+
+
+class DigestBody(StrictModel):
+    items: list[DigestItem] = Field(
+        description="Distilled findings; each marks its target coins stale."
+    )
+
+
 class LocationCreate(StrictModel):
     kind: str
     label: str

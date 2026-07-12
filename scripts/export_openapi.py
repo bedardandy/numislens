@@ -34,10 +34,10 @@ OUTPUT = REPO_ROOT / "surfaces" / "openapi.json"
 # Tailscale Funnel with the bearer token (see surfaces/README.md).
 SERVER_URL = "https://numislens.YOUR-TAILNET-NAME.ts.net"
 
-# The daemon's OpenAPI exposed 21 unique path templates before Phase 5; adding
-# POST /api/v1/coins/quick makes 22. Assert the real number so an accidental
-# route drop/add is caught at export time.
-EXPECTED_PATH_COUNT = 22
+# The daemon exposed 22 unique path templates after Phase 5; Phase 6 adds
+# GET /api/v1/watch/status and POST /api/v1/watch/digest for 24. Assert the real
+# number so an accidental route drop/add is caught at export time.
+EXPECTED_PATH_COUNT = 24
 
 
 def build_spec() -> dict:

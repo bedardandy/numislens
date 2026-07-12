@@ -41,6 +41,22 @@ class SlotError(LedgerError):
     pass
 
 
+class UnknownSeries(LedgerError):
+    """mark_stale(series=...) named a series no coin in the ledger has.
+
+    Carries the list of series that DO exist (capped) so the caller can tell the
+    user what is actually markable — fail loud, never silently mark nothing.
+    """
+
+    def __init__(self, series: str, known: list[str]) -> None:
+        self.series = series
+        self.known = known
+        shown = ", ".join(known) if known else "(none)"
+        super().__init__(
+            f"unknown series {series!r}; known series: {shown}"
+        )
+
+
 class MoveConflict(LedgerError):
     def __init__(self, accession: str, expected_from: int | None, actual: int | None) -> None:
         self.accession = accession
@@ -508,7 +524,11 @@ class Ledger:
             )
             appraisal_id = cur.lastrowid
 
-            updates = ["last_appraised = ?"]
+            # Recording an appraisal CLEARS staleness — this is the one, atomic
+            # place value-watch staleness is retired (same transaction as the
+            # appraisal insert). A fresh appraisal is exactly the signal the
+            # stale flag was asking for.
+            updates = ["last_appraised = ?", "stale_since = NULL", "stale_reason = NULL"]
             update_params: list = [appraised_at]
             if value_cents is not None:
                 updates.append("value_est_cents = ?")
@@ -545,6 +565,130 @@ class Ledger:
             (coin_id,),
         ).fetchone()
         return _row_to_dict(row)
+
+    # ------------------------------------------------------------------
+    # Value-watch staleness (Phase 6)
+    #
+    # Staleness is METADATA, never a value. Marking a coin stale flags that a
+    # market signal (weekly digest hit, or a >=10% spot move) suggests its
+    # numismatic premium may have drifted and a lazy re-appraisal is warranted.
+    # It NEVER changes value_est_cents. record_appraisal is the only clear path.
+    # ------------------------------------------------------------------
+
+    def known_series(self) -> list[str]:
+        """DISTINCT non-null series present on coins, ordered — the markable set.
+
+        This is the universe ``mark_stale(series=...)`` validates against and the
+        list surfaced (capped) when an unknown series is named.
+        """
+        rows = self.conn.execute(
+            "SELECT DISTINCT series FROM coins WHERE series IS NOT NULL ORDER BY series"
+        ).fetchall()
+        return [row["series"] for row in rows]
+
+    def _mark_coin_ids_stale(self, coin_ids: list[int], reason: str, now: str) -> int:
+        if not coin_ids:
+            return 0
+        placeholders = ",".join("?" for _ in coin_ids)
+        cur = self.conn.execute(
+            f"UPDATE coins SET stale_since = ?, stale_reason = ? WHERE id IN ({placeholders})",
+            [now, reason, *coin_ids],
+        )
+        return cur.rowcount
+
+    def mark_stale(
+        self,
+        *,
+        accessions: list[str] | None = None,
+        series: str | None = None,
+        set_id: int | str | None = None,
+        reason: str,
+    ) -> int:
+        """Flag coins stale for value-watch. Returns the number of coins marked.
+
+        Provide EXACTLY ONE target:
+
+        - ``accessions``: an explicit list; an unknown accession raises
+          ``CoinNotFound`` (fail loud — nothing is marked).
+        - ``series``: case-insensitive EXACT match against the DISTINCT series
+          stored on coins. An unknown series raises ``UnknownSeries`` carrying
+          the list of series that DO exist (capped at 50).
+        - ``set_id``: numeric id or set_key; marks every coin assigned to a slot
+          of that set.
+
+        ``reason`` is required and stored verbatim in ``stale_reason``. Marking
+        refreshes ``stale_since`` to now and overwrites any prior reason. This
+        never touches ``value_est_cents``.
+        """
+        if not reason:
+            raise ValueError("mark_stale requires a non-empty reason")
+        targets = [t for t in (accessions, series, set_id) if t is not None]
+        if len(targets) != 1:
+            raise ValueError(
+                "mark_stale requires exactly one of accessions, series, or set_id"
+            )
+
+        now = _utcnow()
+
+        if accessions is not None:
+            # Resolve every accession first so an unknown one fails loud before
+            # anything is marked.
+            coin_ids = [self._coin_id(acc) for acc in accessions]
+        elif series is not None:
+            known = self.known_series()
+            match = {s.lower(): s for s in known}.get(series.lower())
+            if match is None:
+                raise UnknownSeries(series, known[:50])
+            coin_ids = [
+                row["id"]
+                for row in self.conn.execute(
+                    "SELECT id FROM coins WHERE series = ?", (match,)
+                ).fetchall()
+            ]
+        else:
+            resolved_set_id = self._set_id(set_id)
+            coin_ids = [
+                row["coin_id"]
+                for row in self.conn.execute(
+                    "SELECT coin_id FROM set_slots WHERE set_id = ? AND coin_id IS NOT NULL",
+                    (resolved_set_id,),
+                ).fetchall()
+            ]
+
+        with self.conn:
+            self.conn.execute("PRAGMA foreign_keys = ON")
+            return self._mark_coin_ids_stale(coin_ids, reason, now)
+
+    def list_stale(self) -> list[dict]:
+        """All currently-stale coins (full rows), newest staleness first."""
+        rows = self.conn.execute(
+            """
+            SELECT * FROM coins
+            WHERE stale_since IS NOT NULL
+            ORDER BY stale_since DESC, accession_no
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def watchlist(self, n: int = 25) -> list[dict]:
+        """Top-``n`` coins by value_est_cents (ties by accession).
+
+        Coins with a NULL value are EXCLUDED — an unappraised coin is not
+        watchable, it is simply unpriced. This is the monthly per-coin sweep
+        candidate set.
+        """
+        if n < 0:
+            raise ValueError("watchlist n must be non-negative")
+        rows = self.conn.execute(
+            """
+            SELECT * FROM coins
+            WHERE value_est_cents IS NOT NULL
+            ORDER BY value_est_cents DESC, accession_no
+            LIMIT ?
+            """,
+            (n,),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def add_image(
         self,
