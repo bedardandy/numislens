@@ -130,11 +130,22 @@ class NumislensApp {
             // Call the AI analysis
             const result = await this.getCoinAnalysis();
 
-            // Display results
-            this.displayResults(result);
-
             // Show results section
             this.resultsSection.style.display = 'block';
+
+            if (!result.success || !result.coin) {
+                this.displayError(result.error);
+                this.resultsSection.scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+
+            const coin = result.coin;
+            this.displayResults({
+                name: coin.name || 'Unknown Coin',
+                grade: coin.grade || 'Unknown Grade',
+                value: coin.estimatedValue || 'Value Not Available',
+                details: coin.conditionDetails || 'No details available'
+            });
 
             // Scroll to results
             this.resultsSection.scrollIntoView({ behavior: 'smooth' });
@@ -175,38 +186,8 @@ class NumislensApp {
     }
 
     async getCoinAnalysis() {
-        // Import and use the AI service
-        // In a real implementation, we would import the actual AI service
-        // For now, we'll instantiate the CoinAIService class
-
-        // Create an instance of the AI service
         const aiService = new CoinAIService();
-
-        try {
-            // Call the AI service to identify the coin
-            const result = await aiService.identifyCoin(this.frontImage, this.edgeImage);
-
-            // Extract the coin data from the result
-            const coinData = result.coin;
-
-            // Format the result to match what the UI expects
-            return {
-                name: coinData.name || 'Unknown Coin',
-                grade: coinData.grade || 'Unknown Grade',
-                value: coinData.estimatedValue || 'Value Not Available',
-                details: coinData.conditionDetails || 'No details available'
-            };
-        } catch (error) {
-            console.error('AI analysis error:', error);
-
-            // If AI service fails, return a default response
-            return {
-                name: 'Unable to identify coin',
-                grade: 'Unknown',
-                value: 'Value Not Available',
-                details: 'Could not analyze the coin. Please try again with clearer images.'
-            };
-        }
+        return await aiService.identifyCoin(this.frontImage, this.edgeImage);
     }
 
     displayResults(result) {
@@ -214,6 +195,13 @@ class NumislensApp {
         this.coinGrade.textContent = result.grade;
         this.coinValue.textContent = result.value;
         this.coinDetails.textContent = result.details;
+    }
+
+    displayError(errorMessage) {
+        this.coinName.textContent = 'Identification failed';
+        this.coinGrade.textContent = '—';
+        this.coinValue.textContent = '—';
+        this.coinDetails.textContent = (errorMessage ? errorMessage + '. ' : '') + 'No result was produced. Check that the local AI server is running and reachable, then try again with clearer images.';
     }
 
     resetApp() {
