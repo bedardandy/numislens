@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "numislens-core"
+version = "0.1.0"
+description = "NumisLens core: SQLite ledger for a coin collection"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools]
+packages = ["numislens_core"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
