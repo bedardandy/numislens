@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class CoinCreate(BaseModel):
+class StrictModel(BaseModel):
+    # Unknown fields must 422, not vanish: assistant callers guess field
+    # names (e.g. "mint" for "mintmark") and silent drops lose data.
+    model_config = ConfigDict(extra="forbid")
+
+
+class CoinCreate(StrictModel):
     series: Optional[str] = None
     year: Optional[int] = None
     mintmark: Optional[str] = None
@@ -33,11 +39,11 @@ class CoinCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class MoveBody(BaseModel):
+class MoveBody(StrictModel):
     location_id: int
 
 
-class AppraiseBody(BaseModel):
+class AppraiseBody(StrictModel):
     appraised_by: str
     grade_bucket: Optional[str] = None
     value_cents: Optional[int] = Field(
@@ -51,23 +57,23 @@ class AppraiseBody(BaseModel):
     confidence: Optional[float] = None
 
 
-class LocationCreate(BaseModel):
+class LocationCreate(StrictModel):
     kind: str
     label: str
     parent_id: Optional[int] = None
 
 
-class SlotSpec(BaseModel):
+class SlotSpec(StrictModel):
     year: int
     mint: str
     note: Optional[str] = None
 
 
-class AssignBody(BaseModel):
+class AssignBody(StrictModel):
     slot: SlotSpec
     accession: str
 
 
-class SetLoad(BaseModel):
+class SetLoad(StrictModel):
     manifest_path: Optional[str] = None
     manifest: Optional[dict] = None
