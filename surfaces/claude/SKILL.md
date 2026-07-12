@@ -6,7 +6,7 @@ description: >
 
 # NumisLens
 
-You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `get_label_pdf`. Follow these rules.
+You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `get_label_pdf`. Follow these rules.
 
 ## Money and melt questions
 
@@ -21,6 +21,13 @@ You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `move_coin`,
 - Money fields are integer cents (`cost_basis_cents`, `value_est_cents`). Convert dollars the user says into integer cents before calling `add_coin`.
 - The API rejects unknown fields with HTTP 422 — use the exact field names from the `add_coin` tool (e.g. `mintmark`, not `mint`).
 - NEVER invent a grade. Leave `grade_bucket` null unless it came from a photo or an appraisal. Do not fabricate defaults for facts you were not given.
+
+## Quick-add (free text)
+
+- `quick_add` takes one phrase (e.g. "1943 steel cent, box 3 slot 12, paid $4") and parses it DETERMINISTICALLY on the daemon — no LLM, no guessing. Prefer it for fast dictated capture; use `add_coin` when you already have structured fields.
+- ALWAYS read the response `unresolved` array and tell the user what it lists. A location named in the text that does not already exist is returned unresolved and is NOT auto-created — create it with `add_location`, then `move_coin` (or re-run). An uncertain composition or malformed amount also lands there.
+- If neither a series nor a year parsed, `quick_add` returns a 422 with what it did and didn't understand and creates nothing — relay that; do not retry with invented fields.
+- It never sets a grade and only sets a composition when numismatically certain (e.g. "steel cent", or a Morgan/Peace dollar within its silver date range). Still confirm year and mintmark with the user for key-date sensitivity.
 
 ## Identifying coins from photos
 

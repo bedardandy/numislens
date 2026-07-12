@@ -39,6 +39,12 @@ class CoinCreate(StrictModel):
     notes: Optional[str] = None
 
 
+class QuickAddBody(StrictModel):
+    text: str = Field(
+        description="Free-text coin capture, e.g. '1943 steel cent, box 3 slot 12, paid $4'."
+    )
+
+
 class MoveBody(StrictModel):
     location_id: int
     expected_from_location_id: Optional[int] = Field(

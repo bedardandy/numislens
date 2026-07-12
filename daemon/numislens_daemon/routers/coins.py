@@ -11,7 +11,8 @@ from fastapi.responses import FileResponse
 from numislens_core import Ledger
 
 from ..deps import get_ledger
-from ..schemas import AppraiseBody, CoinCreate, MoveBody
+from ..quickadd import parse_quick_add
+from ..schemas import AppraiseBody, CoinCreate, MoveBody, QuickAddBody
 from ..serializers import serialize_coin
 
 router = APIRouter()
@@ -30,6 +31,61 @@ _CONTENT_TYPE_EXT = {
 def create_coin(body: CoinCreate, ldb: LedgerDep) -> dict | None:
     accession = ldb.add_coin(**body.model_dump(exclude_unset=True, exclude_none=True))
     return serialize_coin(ldb.get_coin(accession))
+
+
+@router.post("/coins/quick", tags=["coins"])
+def quick_add_coin(body: QuickAddBody, ldb: LedgerDep) -> dict:
+    """Deterministically parse free text and create a coin if it is safe to.
+
+    NO LLM, NO guessing. The coin is created only when at least a series or a
+    year parsed cleanly; otherwise this responds 422 with what it did and did
+    not understand. Composition is set only by numismatically CERTAIN rules;
+    grade is never parsed. Unmapped phrases (unknown locations, uncertain
+    compositions, malformed money) are returned in ``unresolved`` — a mentioned
+    location that does not already exist is listed there, NOT auto-created.
+    """
+    series_names = [
+        row["series"]
+        for row in ldb.conn.execute(
+            "SELECT DISTINCT series FROM sets WHERE series IS NOT NULL"
+        ).fetchall()
+    ]
+    locations = [
+        dict(row)
+        for row in ldb.conn.execute(
+            "SELECT id, parent_id, kind, label FROM locations"
+        ).fetchall()
+    ]
+    result = parse_quick_add(
+        body.text,
+        compositions=ldb.list_compositions(),
+        series_names=series_names,
+        locations=locations,
+    )
+    parsed = result["parsed"]
+    unresolved = result["unresolved"]
+
+    # Fail-loud contract: never guess. Require at least a series or a year.
+    if "series" not in parsed and "year" not in parsed:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": (
+                    "could not identify a coin: need at least a series or a "
+                    "4-digit year"
+                ),
+                "parsed": parsed,
+                "unresolved": unresolved,
+            },
+        )
+
+    accession = ldb.add_coin(**parsed)
+    return {
+        "parsed": parsed,
+        "unresolved": unresolved,
+        "created": accession,
+        "coin": serialize_coin(ldb.get_coin(accession)),
+    }
 
 
 @router.get("/coins", tags=["coins"])

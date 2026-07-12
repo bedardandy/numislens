@@ -17,6 +17,7 @@ from numislens_mcp.server import (
     melt_status,
     melt_update,
     move_coin,
+    quick_add,
     set_gaps,
 )
 
@@ -204,6 +205,38 @@ async def test_get_label_pdf_writes_file(tmp_path) -> None:
 async def test_get_label_pdf_requires_exactly_one() -> None:
     result = await get_label_pdf(output_path="/tmp/x.pdf")
     assert result == "Error: provide exactly one of location_id or accessions"
+
+
+async def test_quick_add_posts_text_and_relays_unresolved() -> None:
+    payload = {
+        "parsed": {"year": 1943, "series": "Lincoln Wheat Cent"},
+        "unresolved": ["box 9"],
+        "created": "NL-000007",
+        "coin": {"accession_no": "NL-000007"},
+    }
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.post("/api/v1/coins/quick").mock(
+            return_value=Response(200, json=payload)
+        )
+        result = await quick_add("1943 steel cent, box 9")
+        assert route.called
+        body = json.loads(route.calls.last.request.content)
+        assert body == {"text": "1943 steel cent, box 9"}
+    parsed = json.loads(result)
+    assert parsed["created"] == "NL-000007"
+    assert parsed["unresolved"] == ["box 9"]
+
+
+async def test_quick_add_422_relays_detail() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.post("/api/v1/coins/quick").mock(
+            return_value=Response(
+                422,
+                json={"detail": "could not identify a coin: need a series or a year"},
+            )
+        )
+        result = await quick_add("asdf qwerty")
+    assert result.startswith("Error: API error 422:")
 
 
 async def test_melt_update_posts() -> None:

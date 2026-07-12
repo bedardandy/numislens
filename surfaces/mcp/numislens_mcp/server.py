@@ -162,6 +162,42 @@ async def add_coin(
 
 
 @mcp.tool(
+    name="quick_add",
+    annotations={
+        "title": "Quick Add Coin",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+)
+async def quick_add(text: str) -> str:
+    """Add a coin from one free-text phrase, parsed DETERMINISTICALLY (no LLM).
+
+    Pass natural text like ``"1943 steel cent, box 3 slot 12, paid $4"`` or
+    ``"add 1885 Morgan dollar CC to tray 2"``. The daemon extracts year,
+    mintmark, series, denomination, cost (integer cents), a numismatically
+    CERTAIN composition, and an EXISTING location — it never guesses.
+
+    CONTRACT — always read the response's ``unresolved`` array and relay it to
+    the user. It lists anything recognized but not mapped: a location that does
+    not already exist (it is NOT auto-created — create it first, then re-add or
+    move the coin), an uncertain composition, or a malformed amount. If neither
+    a series nor a year could be parsed the call returns a 422 error describing
+    what was and was not understood, and NO coin is created. Grade is never
+    parsed. The response is ``{parsed, unresolved, created, coin}`` where
+    ``created`` is the new accession number (or the call errored).
+    """
+    try:
+        result = await _client().request_json(
+            "POST", "/api/v1/coins/quick", json={"text": text}
+        )
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
     name="move_coin",
     annotations={
         "title": "Move Coin",
