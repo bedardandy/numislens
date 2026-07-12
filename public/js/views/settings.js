@@ -1,5 +1,6 @@
 import * as api from '../api.js';
-import { toast } from '../app.js';
+import { toast, refreshQueueBanner } from '../app.js';
+import { listQueuedMoves, discardMove } from '../offline.js';
 
 export function renderSettings(el) {
   el.replaceChildren();
@@ -88,4 +89,70 @@ export function renderSettings(el) {
 
   form.appendChild(healthSection);
   el.appendChild(form);
+
+  const queueSection = document.createElement('div');
+  queueSection.className = 'settings-queue';
+  const queueHeading = document.createElement('h3');
+  queueHeading.textContent = 'Queued offline moves';
+  queueSection.appendChild(queueHeading);
+  const queueList = document.createElement('div');
+  queueList.className = 'settings-queue-list';
+  queueSection.appendChild(queueList);
+  el.appendChild(queueSection);
+
+  async function loadQueue() {
+    queueList.replaceChildren();
+    let items;
+    try {
+      items = await listQueuedMoves();
+    } catch {
+      items = [];
+    }
+    if (!items.length) {
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = 'No queued moves.';
+      queueList.appendChild(p);
+      return;
+    }
+    const ul = document.createElement('ul');
+    ul.className = 'queue-items';
+    for (const item of items) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent =
+        item.record.accession +
+        ' \u2192 location ' +
+        item.record.location_id +
+        ' (queued ' +
+        item.record.queued_at +
+        ')';
+      li.appendChild(span);
+      const discardBtn = document.createElement('button');
+      discardBtn.type = 'button';
+      discardBtn.textContent = 'Discard';
+      discardBtn.addEventListener('click', async () => {
+        if (
+          !window.confirm(
+            'Discard the queued move for ' + item.record.accession + '? This cannot be undone.'
+          )
+        ) {
+          return;
+        }
+        try {
+          await discardMove(item.key);
+          toast('Queued move discarded', 'info');
+          await loadQueue();
+          await refreshQueueBanner();
+        } catch (err) {
+          toast('Could not discard: ' + err.message, 'error');
+        }
+      });
+      li.appendChild(discardBtn);
+      ul.appendChild(li);
+    }
+    queueList.appendChild(ul);
+  }
+
+  loadQueue();
 }

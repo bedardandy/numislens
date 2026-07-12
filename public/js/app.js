@@ -7,6 +7,8 @@ import { renderAdd } from './views/add.js';
 import { renderLocations } from './views/locations.js';
 import { renderSets, renderSetBoard } from './views/sets.js';
 import { renderMelt } from './views/melt.js';
+import { renderCycleCount } from './views/cyclecount.js';
+import { replayMoveQueue, queuedMoveCount } from './offline.js';
 
 const TOAST_DURATIONS = { error: 8000, info: 4000, success: 4000 };
 let toastRegion = null;
@@ -41,6 +43,33 @@ export function toast(message, kind = 'info') {
   const duration = TOAST_DURATIONS[kind] ?? TOAST_DURATIONS.info;
   let timer = window.setTimeout(() => item.remove(), duration);
   dismiss.addEventListener('click', () => window.clearTimeout(timer), { once: true });
+}
+
+export async function refreshQueueBanner() {
+  const bar = document.getElementById('status-bar');
+  if (!bar) return;
+  let count = 0;
+  try { count = await queuedMoveCount(); } catch { count = 0; }
+  if (count > 0) {
+    bar.hidden = false;
+    bar.textContent = count + ' queued move' + (count === 1 ? '' : 's') + (navigator.onLine ? ' — syncing…' : ' — will sync when online');
+  } else if (!navigator.onLine) {
+    bar.hidden = false;
+    bar.textContent = 'Offline';
+  } else {
+    bar.hidden = true;
+    bar.textContent = '';
+  }
+}
+
+async function runReplay() {
+  if (!navigator.onLine) return;
+  let res;
+  try { res = await replayMoveQueue(); } catch { return; }
+  if (res.busy) return;
+  if (res.replayed > 0) toast('Synced ' + res.replayed + ' queued move' + (res.replayed === 1 ? '' : 's'), 'success');
+  if (res.stopped) toast('Sync stopped: ' + res.error, 'error');
+  await refreshQueueBanner();
 }
 
 const NAV_ITEMS = [
@@ -126,6 +155,14 @@ function buildShell() {
   header.appendChild(nav);
   app.appendChild(header);
 
+  const statusBar = document.createElement('div');
+  statusBar.id = 'status-bar';
+  statusBar.className = 'status-bar';
+  statusBar.hidden = true;
+  statusBar.setAttribute('role', 'status');
+  statusBar.setAttribute('aria-live', 'polite');
+  app.appendChild(statusBar);
+
   const main = document.createElement('main');
   const viewEl = document.createElement('div');
   viewEl.id = 'view';
@@ -149,7 +186,7 @@ function buildShell() {
 
 function setActiveNav(routeName) {
   const activeRoute =
-    routeName === 'coin' ? 'inventory' : routeName === 'setboard' ? 'sets' : routeName;
+    routeName === 'coin' ? 'inventory' : routeName === 'setboard' ? 'sets' : routeName === 'count' ? 'locations' : routeName;
   for (const item of NAV_ITEMS) {
     if (!item.route) continue;
     const el = document.getElementById(`nav-${item.id}`);
@@ -195,6 +232,7 @@ function onRoute(route) {
   if (!viewEl) return;
 
   setActiveNav(route.name);
+  refreshQueueBanner();
 
   if (!api.getToken() && route.name !== 'settings') {
     renderConnectPrompt(viewEl);
@@ -226,6 +264,9 @@ function onRoute(route) {
     case 'settings':
       renderSettings(viewEl);
       break;
+    case 'count':
+      renderCycleCount(viewEl, route.params.locationId);
+      break;
     default:
       renderInventory(viewEl);
   }
@@ -248,6 +289,10 @@ function init() {
   });
 
   registerServiceWorker();
+  window.addEventListener('online', () => { runReplay(); });
+  window.addEventListener('offline', () => { refreshQueueBanner(); });
+  refreshQueueBanner();
+  runReplay();
 }
 
 if (document.readyState === 'loading') {

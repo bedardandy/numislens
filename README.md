@@ -1,6 +1,6 @@
 # Numislens - AI Coin Identifier
 
-Numislens is a Progressive Web Application (PWA) that uses AI to identify and grade antique and rare coins. Simply take pictures of the front and edge of your coin to get identification, condition grade, and value estimation.
+Numislens is a coin-collection platform built around a single SQLite ledger and a small REST daemon, with thin clients (a PWA, a Claude MCP/skill, and more) over one OpenAPI surface. The Progressive Web App (PWA) is a phone/desktop view onto that ledger: browse and add coins, organize physical locations, track set completion, watch deterministic melt values, and reconcile boxes offline. Coin identification and grading are performed by the platform's tiered vision pipeline (planned), never fabricated.
 
 ## Repository layout
 
@@ -8,7 +8,7 @@ Numislens is a Progressive Web Application (PWA) that uses AI to identify and gr
 - **`daemon/`** — FastAPI REST + OpenAPI surface, bearer auth, label PDFs.
 - **`ops/`** — operational files: user-level systemd units for the daily melt update, plus Litestream and dump-based backup config. See `ops/README.md` and `ops/BACKUP.md`. Nothing here is installed or enabled automatically.
 - **`surfaces/`** — thin assistant skins over the REST API: a Claude MCP server (`surfaces/mcp/`) and a Claude Code skill (`surfaces/claude/SKILL.md`), with more (ChatGPT Action, Gemini, Siri) planned. Each is a client of the daemon's OpenAPI surface — no business logic. See `surfaces/README.md`.
-- **`public/`** — the existing vanilla-JS PWA. It is slated for a thin rebuild against the core API in a later phase; treat it as legacy for now.
+- **`public/`** — the thin-client PWA: vanilla ES modules that call the daemon's REST API, with offline read snapshots, an offline move queue, and cycle-count mode. The daemon serves it as static files.
 
 ### Core CLI quickstart
 
@@ -26,101 +26,52 @@ Melt fetching is keyless and fail-loud: it never fabricates a price and exits no
 
 ## Features
 
-- **AI-Powered Identification**: Uses advanced AI to identify coin types
-- **Condition Grading**: Evaluates coin condition using standard numismatic scales
-- **Value Estimation**: Provides ballpark value estimates without external pricing APIs
-- **PWA Support**: Works offline, installable on mobile and desktop
-- **Camera Integration**: Direct camera access for easy image capture
-- **Image Processing**: Optimizes images for better AI analysis
-
-## How It Works
-
-1. **Capture Images**: Take photos of the front and edge of your coin
-2. **AI Analysis**: Our AI model identifies the coin type and evaluates condition
-3. **Get Results**: Receive identification, grade, and value estimate
-4. **Save/Share**: Save results or share with others
+- **Collection ledger**: every coin is an accession (`NL-000001…`) in one SQLite database — the source of truth for all surfaces.
+- **Inventory browser**: search and filter coins by series, year, mintmark, and location; drill into any coin's detail.
+- **Add with photos**: create a coin and capture obverse / reverse / edge / slab images from the device camera.
+- **Locations**: nest cabinets → boxes → trays → slots (and albums → pages → pockets); every coin lives in exactly one, and moves are recorded as events.
+- **Set-completion boards**: visual album grids per set with filled/gap slot chips, key-date markers, and an assign-coin picker.
+- **Melt dashboard**: deterministic, keyless precious-metal melt values with a dual-source spot cross-check — never fabricated, fail-loud on source disagreement or staleness.
+- **Offline-first**: cached read snapshots (always shown with an OFFLINE banner) and a queue for offline coin moves that replays in order when connectivity returns.
+- **Cycle-count mode**: warehouse-style reconciliation of a location's expected contents against what is physically present, with a copyable report.
+- **QR labels**: printable accession labels (PDF) whose QR codes deep-link into the app.
+- **Installable PWA**: works offline, installs on mobile and desktop.
 
 ## Technology Stack
 
-- **Frontend**: Vanilla JavaScript, HTML5, CSS3
-- **Architecture**: Progressive Web App (PWA)
-- **AI Integration**: OpenAI-compatible API (configured for llama.cpp)
-- **Image Processing**: Client-side preprocessing
-- **Offline Support**: Service Worker caching
+- **Frontend**: Vanilla JavaScript ES modules, HTML5, CSS3 — no framework, no build step
+- **Architecture**: Progressive Web App (thin client over the daemon's OpenAPI surface)
+- **Backend**: FastAPI daemon (`daemon/`) over the `numislens_core` SQLite ledger
+- **Offline support**: Service Worker asset cache + IndexedDB read snapshots and write queue
 
-## Installation
+## Running the PWA
 
-### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn package manager
+The PWA is static and is served by the daemon — there is no separate build step or Node dependency.
 
-### Setup
 ```bash
-# Clone the repository
-git clone https://github.com/bedardandy/numislens.git
-cd numislens
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+pip install -e core -e daemon
+NUMISLENS_TOKEN=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))") \
+  numislens-daemon --db ~/.local/share/numislens/numislens.db
 ```
 
-The application will be available at `http://localhost:3000`
+Then open the daemon's address in a modern browser, go to **Settings**, and paste the bearer token to connect. The app is intended to be reached over LAN/Tailscale only.
 
-## Usage
+## PWA views and modules
 
-1. Open the application in a modern browser (Chrome, Firefox, Safari, Edge)
-2. Allow camera access when prompted
-3. Take photos of the front and edge of your coin
-4. Click "Analyze Coin" to get results
-5. Review identification, grade, and value estimate
-
-## API Integration
-
-The application is designed to work with an OpenAI-compatible API, specifically configured for llama.cpp with vision capabilities. To configure:
-
-1. Start your llama.cpp server with vision support:
-   ```bash
-   ./server -m your-vision-model.gguf --port 8080 --chat-template llama3 -c 4096
-   ```
-
-2. Update the API endpoint in `public/js/config.js` if using a different port:
-   ```javascript
-   apiEndpoint: 'http://localhost:8080/v1/chat/completions',
-   ```
-
-3. The application uses the default llama.cpp API key ('sk-llama'), set in `public/js/config.js`, which can be changed there.
-
-4. Ensure your model supports image inputs (like LLaVA, Phi-3 Vision, etc.)
-
-## PWA Features
-
-- **Installable**: Add to home screen on mobile or desktop
-- **Offline Support**: Core functionality works without internet
-- **Responsive**: Works on mobile, tablet, and desktop
-- **Fast Loading**: Service worker caches assets for quick access
-
-## Components
-
-- `public/index.html` - Main application structure
-- `public/js/config.js` - Central configuration (endpoint, model, key, timeout)
-- `public/js/app.js` - Core application logic
-- `public/js/aiService.js` - AI integration layer
-- `public/js/gradingSystem.js` - Coin grading algorithms
-- `public/js/valueEstimation.js` - Value calculation algorithms
-- `public/js/imageProcessor.js` - Image processing functions
-- `public/styles/main.css` - Styling
-- `public/sw.js` - Service worker for PWA features
+- `public/index.html` — app shell
+- `public/js/app.js` — shell, navigation (with a responsive "More" overflow menu), routing, the offline status bar, and move-queue replay
+- `public/js/api.js` — bearer-authenticated client for the daemon REST API
+- `public/js/router.js` — hash router
+- `public/js/store.js`, `public/js/offline.js` — IndexedDB snapshot cache and offline move queue
+- `public/js/views/` — `inventory`, `coin`, `add`, `locations`, `sets`, `melt`, `cyclecount`, `settings`
+- `public/js/photo.js`, `public/js/money.js`, `public/js/tree.js` — camera capture, dollar-input parsing, location-tree helpers
+- `public/sw.js` — service worker (its precache list is versioned per release)
 
 ## Testing
 
-Run the test suite to validate functionality:
-
-```bash
-npm test
-```
+- Core: `cd core && python3 -m pytest`
+- Daemon: `cd daemon && python3 -m pytest`
+- PWA smoke: `python3 scripts/e2e_smoke.py` (scratch daemon + temp DB) and `python3 scripts/check_sw_files.py` (service-worker precache list vs. files on disk)
 
 ## Deployment
 

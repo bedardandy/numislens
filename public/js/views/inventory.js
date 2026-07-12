@@ -1,5 +1,6 @@
 import { listCoins, locationTree } from '../api.js';
 import { toast } from '../app.js';
+import { cacheSnapshot, readSnapshot, offlineBanner, isNetworkError } from '../offline.js';
 import { navigate } from '../router.js';
 import { flattenLocationTree, populateLocationSelect } from '../tree.js';
 
@@ -129,8 +130,10 @@ export async function renderInventory(el) {
   try {
     const data = await locationTree();
     if (data?.tree) locationPaths = flattenLocationTree(data.tree);
+    await cacheSnapshot('locations:tree', data);
   } catch {
-    /* list coins anyway; location column shows em-dash */
+    const snap = await readSnapshot('locations:tree');
+    if (snap && snap.data && snap.data.tree) locationPaths = flattenLocationTree(snap.data.tree);
   }
 
   const filterBar = document.createElement('div');
@@ -190,12 +193,31 @@ export async function renderInventory(el) {
 
     try {
       const coins = await listCoins(params);
+      if (!filtered) await cacheSnapshot('coins', coins);
       if (!coins.length) {
         renderEmptyState(resultsContainer, filtered);
       } else {
         renderCoinTable(resultsContainer, coins, locationPaths);
       }
     } catch (err) {
+      if (isNetworkError(err)) {
+        const snap = await readSnapshot('coins');
+        if (snap && Array.isArray(snap.data)) {
+          resultsContainer.replaceChildren();
+          resultsContainer.appendChild(offlineBanner(snap.cachedAt));
+          if (snap.data.length) {
+            const holder = document.createElement('div');
+            renderCoinTable(holder, snap.data, locationPaths);
+            resultsContainer.appendChild(holder);
+          } else {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = 'No cached coins.';
+            resultsContainer.appendChild(empty);
+          }
+          return;
+        }
+      }
       resultsContainer.replaceChildren();
       const errDiv = document.createElement('div');
       errDiv.className = 'empty-state';

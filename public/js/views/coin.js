@@ -5,7 +5,8 @@ import {
   moveCoin,
   fetchBlob,
 } from '../api.js';
-import { toast } from '../app.js';
+import { enqueueMove, isNetworkError } from '../offline.js';
+import { toast, refreshQueueBanner } from '../app.js';
 import { navigate } from '../router.js';
 import { flattenLocationTree, populateLocationSelect } from '../tree.js';
 import { renderPhotoCapture } from '../photo.js';
@@ -223,7 +224,18 @@ export async function renderCoin(el, accession) {
       toast('Moved', 'success');
       await renderCoin(el, accession);
     } catch (err) {
-      toast(err.message, 'error');
+      if (isNetworkError(err)) {
+        try {
+          await enqueueMove(accession, selectedId);
+          toast('Move queued — will sync when back online', 'info');
+          movePicker.style.display = 'none';
+          await refreshQueueBanner();
+        } catch (qerr) {
+          toast('Could not queue move: ' + qerr.message, 'error');
+        }
+      } else {
+        toast(err.message, 'error');
+      }
     } finally {
       confirmMoveBtn.disabled = false;
     }

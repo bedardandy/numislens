@@ -1,6 +1,7 @@
 import { locationTree, getLocation, createLocation } from '../api.js';
 import { toast } from '../app.js';
 import { navigate } from '../router.js';
+import { cacheSnapshot, readSnapshot, offlineBanner, isNetworkError } from '../offline.js';
 
 const LOCATION_KINDS = ['cabinet', 'box', 'tray', 'slot', 'album', 'page', 'row', 'pocket'];
 
@@ -29,7 +30,26 @@ export async function renderLocations(el) {
     let data;
     try {
       data = await locationTree();
+      await cacheSnapshot('locations:tree', data);
     } catch (err) {
+      if (isNetworkError(err)) {
+        const snap = await readSnapshot('locations:tree');
+        if (snap && snap.data && Array.isArray(snap.data.tree)) {
+          treeEl.replaceChildren();
+          treeEl.appendChild(offlineBanner(snap.cachedAt));
+          const nodes = snap.data.tree;
+          if (nodes.length) {
+            treeEl.appendChild(buildTreeList(nodes));
+          } else {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = 'No cached locations.';
+            treeEl.appendChild(empty);
+          }
+          detailEl.replaceChildren();
+          return;
+        }
+      }
       treeEl.replaceChildren();
       const errDiv = document.createElement('div');
       errDiv.className = 'empty-state';
@@ -151,6 +171,12 @@ export async function renderLocations(el) {
       }
       detailEl.appendChild(coinList);
     }
+
+    const countBtn = document.createElement('button');
+    countBtn.type = 'button';
+    countBtn.textContent = 'Count this box';
+    countBtn.addEventListener('click', () => navigate('#/count/' + encodeURIComponent(node.id)));
+    detailEl.appendChild(countBtn);
 
     detailEl.appendChild(makeCreateForm(node.id));
   }

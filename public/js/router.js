@@ -10,6 +10,8 @@ function parseHash(hash) {
   if (m) return { name: 'coin', params: { accession: decodeURIComponent(m[1]) } };
   const sm = path.match(/^\/sets\/(.+)$/);
   if (sm) return { name: 'setboard', params: { setId: decodeURIComponent(sm[1]) } };
+  const cm = path.match(/^\/count\/(.+)$/);
+  if (cm) return { name: 'count', params: { locationId: decodeURIComponent(cm[1]) } };
   return { name: 'inventory', params: {} };
 }
 

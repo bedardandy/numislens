@@ -1,6 +1,7 @@
 import { listSets, getSetBoard, listCoins, assignToSet } from '../api.js';
 import { toast } from '../app.js';
 import { navigate } from '../router.js';
+import { cacheSnapshot, readSnapshot, offlineBanner, isNetworkError } from '../offline.js';
 
 const EM_DASH = '\u2014';
 
@@ -23,13 +24,29 @@ export async function renderSets(el) {
   let sets;
   try {
     sets = await listSets();
+    await cacheSnapshot('sets', sets);
   } catch (err) {
-    const errDiv = document.createElement('div');
-    errDiv.className = 'empty-state';
-    errDiv.textContent = err.message;
-    el.appendChild(errDiv);
-    toast(err.message, 'error');
-    return;
+    if (isNetworkError(err)) {
+      const snap = await readSnapshot('sets');
+      if (snap && Array.isArray(snap.data)) {
+        el.appendChild(offlineBanner(snap.cachedAt));
+        sets = snap.data;
+      } else {
+        const errDiv = document.createElement('div');
+        errDiv.className = 'empty-state';
+        errDiv.textContent = err.message;
+        el.appendChild(errDiv);
+        toast(err.message, 'error');
+        return;
+      }
+    } else {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'empty-state';
+      errDiv.textContent = err.message;
+      el.appendChild(errDiv);
+      toast(err.message, 'error');
+      return;
+    }
   }
 
   if (sets.length === 0) {
@@ -100,24 +117,50 @@ export async function renderSetBoard(el, setId) {
   el.appendChild(loading);
 
   let board;
+  let offlineCachedAt = null;
   try {
     board = await getSetBoard(setId);
+    await cacheSnapshot('setboard:' + setId, board);
   } catch (err) {
-    el.replaceChildren();
-    const backErr = document.createElement('a');
-    backErr.href = '#/sets';
-    backErr.textContent = 'Back to sets';
-    backErr.addEventListener('click', (e) => {
-      e.preventDefault();
-      navigate('#/sets');
-    });
-    el.appendChild(backErr);
-    const errDiv = document.createElement('div');
-    errDiv.className = 'empty-state';
-    errDiv.textContent = err.message;
-    el.appendChild(errDiv);
-    toast(err.message, 'error');
-    return;
+    if (isNetworkError(err)) {
+      const snap = await readSnapshot('setboard:' + setId);
+      if (snap && snap.data) {
+        board = snap.data;
+        offlineCachedAt = snap.cachedAt;
+      } else {
+        el.replaceChildren();
+        const backErr = document.createElement('a');
+        backErr.href = '#/sets';
+        backErr.textContent = 'Back to sets';
+        backErr.addEventListener('click', (e) => {
+          e.preventDefault();
+          navigate('#/sets');
+        });
+        el.appendChild(backErr);
+        const errDiv = document.createElement('div');
+        errDiv.className = 'empty-state';
+        errDiv.textContent = err.message;
+        el.appendChild(errDiv);
+        toast(err.message, 'error');
+        return;
+      }
+    } else {
+      el.replaceChildren();
+      const backErr = document.createElement('a');
+      backErr.href = '#/sets';
+      backErr.textContent = 'Back to sets';
+      backErr.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigate('#/sets');
+      });
+      el.appendChild(backErr);
+      const errDiv = document.createElement('div');
+      errDiv.className = 'empty-state';
+      errDiv.textContent = err.message;
+      el.appendChild(errDiv);
+      toast(err.message, 'error');
+      return;
+    }
   }
 
   el.replaceChildren();
@@ -130,6 +173,10 @@ export async function renderSetBoard(el, setId) {
     navigate('#/sets');
   });
   el.appendChild(backLink);
+
+  if (offlineCachedAt) {
+    el.appendChild(offlineBanner(offlineCachedAt));
+  }
 
   const title = document.createElement('h2');
   title.textContent = board.name;
@@ -203,6 +250,7 @@ export async function renderSetBoard(el, setId) {
         btn.textContent =
           match.accession_no + ' \u00b7 ' + display(match.grade_bucket);
         btn.addEventListener('click', async () => {
+          if (!navigator.onLine) { toast('Assigning a coin requires a connection', 'error'); return; }
           try {
             await assignToSet(
               setId,

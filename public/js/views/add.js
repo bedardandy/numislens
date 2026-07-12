@@ -245,6 +245,7 @@ export async function renderAdd(el) {
   createBtn.type = 'button';
   createBtn.textContent = 'Create coin';
   createBtn.addEventListener('click', async () => {
+    if (!navigator.onLine) { toast('Adding a coin requires a connection', 'error'); return; }
     const body = {};
 
     const series = seriesInput.value.trim();

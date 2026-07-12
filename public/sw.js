@@ -1,4 +1,4 @@
-const CACHE_NAME = 'numislens-v4';
+const CACHE_NAME = 'numislens-v5';
 
 const PRECACHE_URLS = [
   '/',
@@ -11,11 +11,16 @@ const PRECACHE_URLS = [
   '/js/tree.js',
   '/js/money.js',
   '/js/photo.js',
+  '/js/store.js',
+  '/js/offline.js',
   '/js/views/settings.js',
   '/js/views/inventory.js',
   '/js/views/coin.js',
   '/js/views/add.js',
   '/js/views/locations.js',
+  '/js/views/sets.js',
+  '/js/views/melt.js',
+  '/js/views/cyclecount.js',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
 ];
