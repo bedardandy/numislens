@@ -208,6 +208,31 @@ def test_assign_to_slot_and_completion(ledger):
     assert total_after == total
 
 
+def test_set_board(ledger):
+    set_id = ledger.load_set_manifest(PEACE_MANIFEST)
+    accession = ledger.add_coin(
+        series="Peace Dollar", year=1921, mintmark="P", grade_bucket="VF"
+    )
+    ledger.assign_to_slot(
+        set_id,
+        {"year": 1921, "mint": "P", "note": "high relief (first year of issue)"},
+        accession,
+    )
+
+    board = ledger.set_board(set_id)
+    assert board["filled"] == 1
+    assert board["total"] == board["filled"] + len(ledger.set_gaps(set_id))
+    assert len(board["slots"]) == board["total"]
+
+    assigned = next(s for s in board["slots"] if s["year"] == 1921 and s["mint"] == "P")
+    assert assigned["accession"] == accession
+    assert assigned["grade_bucket"] == "VF"
+
+    for slot in board["slots"]:
+        if slot is not assigned:
+            assert slot["accession"] is None
+
+
 def test_assign_to_slot_double_fill_raises_slot_error(ledger):
     set_id = ledger.load_set_manifest(PEACE_MANIFEST)
     slot = {"year": 1922, "mint": "P"}

@@ -48,5 +48,13 @@ def test_melt_status(
     response = client.get("/api/v1/melt/status", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert body["spots"]["XAG"] is not None
+    xag = body["spots"]["XAG"]
+    assert xag is not None
+    assert set(xag) == {
+        "price_usd_cents",
+        "price_display",
+        "source",
+        "fetched_at",
+    }
+    assert xag["source"] == "gold-api"
     assert body["portfolio"]["total_display"]

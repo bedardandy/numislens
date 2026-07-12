@@ -424,6 +424,35 @@ class Ledger:
         ).fetchone()
         return (row["filled"] or 0, row["total"])
 
+    def set_board(self, set_id) -> dict:
+        resolved_set_id = self._set_id(set_id)
+        meta = self.conn.execute(
+            'SELECT set_key, name, series, composition_ref FROM sets WHERE id = ?',
+            (resolved_set_id,),
+        ).fetchone()
+        filled, total = self.set_completion(resolved_set_id)
+        rows = self.conn.execute(
+            '''
+            SELECT s.year, s.mint, s.note, s.key_date,
+                   c.accession_no AS accession, c.grade_bucket AS grade_bucket
+            FROM set_slots s
+            LEFT JOIN coins c ON s.coin_id = c.id
+            WHERE s.set_id = ?
+            ORDER BY s.year, s.mint, s.note
+            ''',
+            (resolved_set_id,),
+        ).fetchall()
+        slots = [dict(row) for row in rows]
+        return {
+            'set_key': meta['set_key'],
+            'name': meta['name'],
+            'series': meta['series'],
+            'composition_ref': meta['composition_ref'],
+            'filled': filled,
+            'total': total,
+            'slots': slots,
+        }
+
     def record_appraisal(
         self,
         accession: str,

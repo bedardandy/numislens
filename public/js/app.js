@@ -5,6 +5,8 @@ import { renderInventory } from './views/inventory.js';
 import { renderCoin } from './views/coin.js';
 import { renderAdd } from './views/add.js';
 import { renderLocations } from './views/locations.js';
+import { renderSets, renderSetBoard } from './views/sets.js';
+import { renderMelt } from './views/melt.js';
 
 const TOAST_DURATIONS = { error: 8000, info: 4000, success: 4000 };
 let toastRegion = null;
@@ -42,12 +44,12 @@ export function toast(message, kind = 'info') {
 }
 
 const NAV_ITEMS = [
-  { id: 'inventory', label: 'Inventory', hash: '#/', route: 'inventory' },
-  { id: 'add', label: 'Add', hash: '#/add', route: 'add' },
-  { id: 'locations', label: 'Locations', hash: '#/locations', route: 'locations' },
-  { id: 'sets', label: 'Sets', disabled: true },
-  { id: 'melt', label: 'Melt', disabled: true },
-  { id: 'settings', label: 'Settings', hash: '#/settings', route: 'settings' },
+  { id: 'inventory', label: 'Inventory', hash: '#/', route: 'inventory', group: 'primary' },
+  { id: 'add', label: 'Add', hash: '#/add', route: 'add', group: 'primary' },
+  { id: 'sets', label: 'Sets', hash: '#/sets', route: 'sets', group: 'more' },
+  { id: 'melt', label: 'Melt', hash: '#/melt', route: 'melt', group: 'more' },
+  { id: 'locations', label: 'Locations', hash: '#/locations', route: 'locations', group: 'more' },
+  { id: 'settings', label: 'Settings', hash: '#/settings', route: 'settings', group: 'more' },
 ];
 
 function buildShell() {
@@ -60,29 +62,66 @@ function buildShell() {
   const nav = document.createElement('nav');
   nav.className = 'top-nav';
   nav.setAttribute('aria-label', 'Main');
-  nav.style.cssText = 'display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;';
+
+  function makeNavLink(item) {
+    const link = document.createElement('a');
+    link.className = 'nav-item';
+    link.id = `nav-${item.id}`;
+    link.href = item.hash;
+    link.textContent = item.label;
+    link.dataset.route = item.route;
+    return link;
+  }
 
   for (const item of NAV_ITEMS) {
-    if (item.disabled) {
-      const span = document.createElement('span');
-      span.className = 'nav-item nav-item--disabled';
-      span.id = `nav-${item.id}`;
-      span.textContent = item.label;
-      span.title = 'Coming in Phase 3c';
-      span.setAttribute('aria-disabled', 'true');
-      span.setAttribute('aria-label', `${item.label} — Coming in Phase 3c`);
-      span.style.cssText = 'opacity:0.5;cursor:not-allowed;';
-      nav.appendChild(span);
-    } else {
-      const link = document.createElement('a');
-      link.className = 'nav-item';
-      link.id = `nav-${item.id}`;
-      link.href = item.hash;
-      link.textContent = item.label;
-      link.dataset.route = item.route;
-      nav.appendChild(link);
+    if (item.group === 'primary') {
+      nav.appendChild(makeNavLink(item));
     }
   }
+
+  const more = document.createElement('div');
+  more.className = 'nav-more';
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'nav-more-toggle';
+  toggle.textContent = 'More \u25be';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', 'nav-more-panel');
+  toggle.setAttribute('aria-haspopup', 'true');
+  const panel = document.createElement('div');
+  panel.className = 'nav-more-panel';
+  panel.id = 'nav-more-panel';
+  panel.hidden = true;
+  for (const item of NAV_ITEMS) {
+    if (item.group === 'more') {
+      panel.appendChild(makeNavLink(item));
+    }
+  }
+  function closeMore() {
+    panel.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+  }
+  function openMore() {
+    panel.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (panel.hidden) openMore();
+    else closeMore();
+  });
+  panel.addEventListener('click', (e) => {
+    if (e.target.closest('a')) closeMore();
+  });
+  document.addEventListener('click', (e) => {
+    if (!more.contains(e.target)) closeMore();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMore();
+  });
+  more.appendChild(toggle);
+  more.appendChild(panel);
+  nav.appendChild(more);
 
   header.appendChild(nav);
   app.appendChild(header);
@@ -109,9 +148,10 @@ function buildShell() {
 }
 
 function setActiveNav(routeName) {
-  const activeRoute = routeName === 'coin' ? 'inventory' : routeName;
+  const activeRoute =
+    routeName === 'coin' ? 'inventory' : routeName === 'setboard' ? 'sets' : routeName;
   for (const item of NAV_ITEMS) {
-    if (item.disabled || !item.route) continue;
+    if (!item.route) continue;
     const el = document.getElementById(`nav-${item.id}`);
     if (!el) continue;
     const isActive = item.route === activeRoute;
@@ -170,6 +210,15 @@ function onRoute(route) {
       break;
     case 'locations':
       renderLocations(viewEl);
+      break;
+    case 'sets':
+      renderSets(viewEl);
+      break;
+    case 'setboard':
+      renderSetBoard(viewEl, route.params.setId);
+      break;
+    case 'melt':
+      renderMelt(viewEl);
       break;
     case 'coin':
       renderCoin(viewEl, route.params.accession);

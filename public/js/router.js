@@ -4,8 +4,12 @@ function parseHash(hash) {
   if (path === '/settings') return { name: 'settings', params: {} };
   if (path === '/add') return { name: 'add', params: {} };
   if (path === '/locations') return { name: 'locations', params: {} };
+  if (path === '/sets') return { name: 'sets', params: {} };
+  if (path === '/melt') return { name: 'melt', params: {} };
   const m = path.match(/^\/coin\/(.+)$/);
   if (m) return { name: 'coin', params: { accession: decodeURIComponent(m[1]) } };
+  const sm = path.match(/^\/sets\/(.+)$/);
+  if (sm) return { name: 'setboard', params: { setId: decodeURIComponent(sm[1]) } };
   return { name: 'inventory', params: {} };
 }
 

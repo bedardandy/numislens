@@ -214,6 +214,29 @@ def latest_spot_cents(
     return row["price_usd_cents"]
 
 
+def latest_spot(
+    conn: sqlite3.Connection,
+    metal: str,
+    source: str = PRIMARY_SOURCE,
+) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT price_usd_cents, source, fetched_at FROM spot_prices
+        WHERE metal = ? AND source = ?
+        ORDER BY fetched_at DESC, id DESC
+        LIMIT 1
+        """,
+        (metal, source),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "price_usd_cents": row["price_usd_cents"],
+        "source": row["source"],
+        "fetched_at": row["fetched_at"],
+    }
+
+
 def update_melt_values(conn: sqlite3.Connection) -> dict:
     updated: list[dict] = []
     hybrid_floors: list[dict] = []

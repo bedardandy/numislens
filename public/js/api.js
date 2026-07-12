@@ -151,3 +151,38 @@ export function createLocation(kind, label, parentId) {
     body: JSON.stringify(body),
   });
 }
+
+export function listSets() {
+  return apiFetch('/api/v1/sets');
+}
+
+export function getSetStatus(setId) {
+  return apiFetch('/api/v1/sets/' + encodeURIComponent(setId) + '/status');
+}
+
+export function getSetGaps(setId) {
+  return apiFetch('/api/v1/sets/' + encodeURIComponent(setId) + '/gaps');
+}
+
+export function getSetBoard(setId) {
+  return apiFetch('/api/v1/sets/' + encodeURIComponent(setId) + '/board');
+}
+
+export function assignToSet(setId, slot, accession) {
+  return apiFetch('/api/v1/sets/' + encodeURIComponent(setId) + '/assign', {
+    method: 'POST',
+    body: JSON.stringify({ slot, accession }),
+  });
+}
+
+export function meltStatus() {
+  return apiFetch('/api/v1/melt/status');
+}
+
+export function portfolioValue() {
+  return apiFetch('/api/v1/portfolio/value');
+}
+
+export function updateMelt() {
+  return apiFetch('/api/v1/melt/update', { method: 'POST' });
+}

@@ -73,6 +73,12 @@ def set_status(set_id: str, ldb: LedgerDep) -> dict:
     return {"filled": filled, "total": total, "gaps": len(gaps)}
 
 
+@router.get("/sets/{set_id}/board", tags=["sets"])
+def set_board(set_id: str, ldb: LedgerDep) -> dict:
+    sid = _parse_set_id(set_id)
+    return ldb.set_board(sid)
+
+
 @router.post("/sets/{set_id}/assign", tags=["sets"])
 def assign_to_set(set_id: str, body: AssignBody, ldb: LedgerDep) -> dict:
     sid = _parse_set_id(set_id)

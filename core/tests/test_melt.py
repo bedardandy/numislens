@@ -13,6 +13,7 @@ from numislens_core.melt import (
     SpotQuote,
     SpotStale,
     fetch_spot,
+    latest_spot,
     melt_delta,
     portfolio_melt,
     record_spot,
@@ -121,6 +122,19 @@ def test_record_spot_inserts_both_rows(ledger):
     assert by_source[PRIMARY_SOURCE]["fetched_at"] == fetched_at
     assert by_source[CROSSCHECK_SOURCE]["price_usd_cents"] == 6010
     assert by_source[CROSSCHECK_SOURCE]["fetched_at"] == fetched_at
+
+
+def test_latest_spot(ledger):
+    fetched_at = "2026-07-12T12:00:00+00:00"
+    _insert_spot(ledger.conn, "XAG", 6001, fetched_at=fetched_at)
+
+    result = latest_spot(ledger.conn, "XAG")
+    assert result is not None
+    assert result["price_usd_cents"] == 6001
+    assert result["source"] == PRIMARY_SOURCE
+    assert result["fetched_at"] == fetched_at
+
+    assert latest_spot(ledger.conn, "XPT") is None
 
 
 def test_record_spot_dedup_on_reinsert(ledger):

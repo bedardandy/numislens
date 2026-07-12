@@ -41,10 +41,15 @@ def update_melt(ldb: LedgerDep) -> dict:
 def melt_status(ldb: LedgerDep) -> dict:
     spots: dict[str, dict | None] = {}
     for metal in sorted(melt.METALS):
-        cents = melt.latest_spot_cents(ldb.conn, metal, "gold-api")
+        latest = melt.latest_spot(ldb.conn, metal, "gold-api")
         spots[metal] = (
-            {"price_usd_cents": cents, "price_display": dollars(cents)}
-            if cents is not None
+            {
+                "price_usd_cents": latest["price_usd_cents"],
+                "price_display": dollars(latest["price_usd_cents"]),
+                "source": latest["source"],
+                "fetched_at": latest["fetched_at"],
+            }
+            if latest is not None
             else None
         )
 
