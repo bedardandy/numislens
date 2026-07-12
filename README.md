@@ -7,7 +7,7 @@ Numislens is a coin-collection platform built around a single SQLite ledger and 
 - **`core/`** — the collection ledger: a dependency-free Python package (`numislens_core`) over a single SQLite database, plus its data (SQL migrations, the compositions seed, and set manifests in `core/sets/`). This is the source of truth for the whole platform. Run its tests with `cd core && python3 -m pytest`.
 - **`daemon/`** — FastAPI REST + OpenAPI surface, bearer auth, label PDFs.
 - **`ops/`** — operational files: user-level systemd units for the daily melt update, plus Litestream and dump-based backup config. See `ops/README.md` and `ops/BACKUP.md`. Nothing here is installed or enabled automatically.
-- **`surfaces/`** — thin assistant skins over the REST API: a Claude MCP server (`surfaces/mcp/`) and a Claude Code skill (`surfaces/claude/SKILL.md`), with more (ChatGPT Action, Gemini, Siri) planned. Each is a client of the daemon's OpenAPI surface — no business logic. See `surfaces/README.md`.
+- **`surfaces/`** — thin assistant skins over the REST API: a Claude MCP server (`surfaces/mcp/`) and Claude Code skill (`surfaces/claude/SKILL.md`), a ChatGPT Custom GPT Action (`surfaces/chatgpt/`), a Gemini Gem (`surfaces/gemini/`), and Apple Shortcuts recipes (`surfaces/siri/`), all generated from the single committed `surfaces/openapi.json`. Each is a client of the daemon's OpenAPI surface — no business logic. See `surfaces/README.md`.
 - **`public/`** — the thin-client PWA: vanilla ES modules that call the daemon's REST API, with offline read snapshots, an offline move queue, and cycle-count mode. The daemon serves it as static files.
 
 ### Core CLI quickstart
@@ -72,6 +72,7 @@ Then open the daemon's address in a modern browser, go to **Settings**, and past
 - Core: `cd core && python3 -m pytest`
 - Daemon: `cd daemon && python3 -m pytest`
 - PWA smoke: `python3 scripts/e2e_smoke.py` (scratch daemon + temp DB) and `python3 scripts/check_sw_files.py` (service-worker precache list vs. files on disk)
+- OpenAPI artifact: `python3 scripts/export_openapi.py` regenerates `surfaces/openapi.json` and asserts every `/api/v1` path is present and bearer-secured
 
 ## Deployment
 

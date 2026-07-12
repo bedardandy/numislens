@@ -69,12 +69,27 @@ systemctl --user daemon-reload
 systemctl --user enable --now numislens-daemon
 ```
 
-## Assistant surfaces (Phase 2b)
+## Assistant surfaces
 
 The `surfaces/` directory holds thin assistant skins over the daemon's REST API
-(see `surfaces/README.md`). The Claude MCP server is installed separately from
-the daemon; it is a pure REST client and talks to the daemon over HTTP with the
-same bearer token.
+(see `surfaces/README.md`). The generated `surfaces/openapi.json` is the single
+integration artifact.
+
+- **Claude** — MCP server (`surfaces/mcp/`, installed separately, see below) +
+  `surfaces/claude/SKILL.md`.
+- **ChatGPT** — Custom GPT Action (`surfaces/chatgpt/`) importing `openapi.json`.
+- **Gemini** — Gem (`surfaces/gemini/`) importing `openapi.json` (curl fallback).
+- **Siri** — Apple Shortcuts recipes (`surfaces/siri/`) hitting REST directly.
+
+**Funnel guidance:** the local PWA, Claude MCP, and Siri (on your tailnet) reach
+the daemon over LAN/Tailscale. Cloud assistants (ChatGPT, Gemini) call from the
+vendor's servers, so they need the daemon reachable publicly — expose it with a
+Tailscale Funnel (`tailscale funnel 8471`) or a Cloudflare tunnel, never a raw
+port-forward, and mint a **dedicated bearer token** per cloud surface so it can
+be revoked independently. The SQLite ledger never leaves your machine.
+
+The Claude MCP server is installed separately from the daemon; it is a pure REST
+client and talks to the daemon over HTTP with the same bearer token.
 
 ### Install the MCP server
 
