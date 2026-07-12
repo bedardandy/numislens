@@ -1,86 +1,89 @@
-// Service Worker for Numislens PWA
-const CACHE_NAME = 'numislens-v2';
-const urlsToCache = [
+const CACHE_NAME = 'numislens-v3';
+
+const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/styles/main.css',
-  '/js/config.js',
-  '/js/aiService.js',
-  '/js/gradingSystem.js',
-  '/js/valueEstimation.js',
-  '/js/imageProcessor.js',
-  '/js/app.js',
   '/manifest.json',
-  '/icons/icon-72x72.png',
-  '/icons/icon-96x96.png',
-  '/icons/icon-128x128.png',
-  '/icons/icon-144x144.png',
-  '/icons/icon-152x152.png',
+  '/js/app.js',
+  '/js/api.js',
+  '/js/router.js',
+  '/js/views/settings.js',
+  '/js/views/inventory.js',
+  '/js/views/coin.js',
   '/icons/icon-192x192.png',
-  '/icons/icon-384x384.png',
-  '/icons/icon-512x512.png'
+  '/icons/icon-512x512.png',
 ];
 
-// Install event - cache resources
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => self.skipWaiting()) // Activate immediately
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then(() => self.skipWaiting())
   );
 });
 
-// Fetch event - serve from cache or network with fallback strategy
-self.addEventListener('fetch', event => {
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((names) =>
+        Promise.all(
+          names
+            .filter((name) => name !== CACHE_NAME)
+            .map((name) => caches.delete(name))
+        )
+      )
+      .then(() => self.clients.claim())
+  );
+});
+
+function isNavigationRequest(request) {
+  return (
+    request.mode === 'navigate' ||
+    (request.method === 'GET' &&
+      request.headers.get('accept')?.includes('text/html'))
+  );
+}
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  const url = new URL(request.url);
+
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Return cached version if available
-        if (response) {
-          return response;
+    (async () => {
+      const cached = await caches.match(request);
+      if (cached) {
+        return cached;
+      }
+
+      try {
+        const response = await fetch(request);
+        if (response.ok && response.type !== 'opaque') {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(request, response.clone());
         }
-
-        // Else fetch from network
-        return fetch(event.request).catch(() => {
-          // If network fails and it's an HTML page, return the main page
-          if (event.request.destination === 'document') {
-            return caches.match('/');
+        return response;
+      } catch {
+        if (isNavigationRequest(request)) {
+          const fallback = await caches.match('/');
+          if (fallback) {
+            return fallback;
           }
-        });
-      })
+        }
+        throw new Error('Network unavailable');
+      }
+    })()
   );
-});
-
-// Activate event - clean up old caches
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-    .then(() => {
-      console.log('New service worker activated');
-    })
-  );
-});
-
-// Handle push notifications (if needed in future)
-self.addEventListener('push', event => {
-  console.log('Received a push notification');
-  // Handle push notification here if implemented
-});
-
-// Handle background sync (if needed in future)
-self.addEventListener('sync', event => {
-  console.log('Background sync event received');
-  // Handle background sync here if implemented
 });

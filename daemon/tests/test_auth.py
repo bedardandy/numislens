@@ -26,7 +26,9 @@ def test_health_with_correct_token_returns_ok(
 ) -> None:
     response = client.get("/api/v1/health", headers=auth_headers)
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert "version" in body
 
 
 def test_create_app_without_token_raises_runtime_error(

@@ -43,7 +43,7 @@ def create_app(
 
     @router.get("/health", tags=["meta"])
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "version": app.version}
 
     router.include_router(coins.router)
     router.include_router(locations.router)

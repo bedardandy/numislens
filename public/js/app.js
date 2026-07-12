@@ -1,334 +1,198 @@
-// Numislens - AI Coin Identifier Application
-class NumislensApp {
-    constructor() {
-        this.frontImage = null;
-        this.edgeImage = null;
-        this.deferredPrompt = null; // For PWA installation prompt
-        this.initializeElements();
-        this.bindEvents();
-        this.checkOfflineStatus();
-        this.setupInstallPrompt();
-    }
+import * as api from './api.js';
+import { initRouter, navigate } from './router.js';
+import { renderSettings } from './views/settings.js';
+import { renderInventory } from './views/inventory.js';
+import { renderCoin } from './views/coin.js';
 
-    initializeElements() {
-        // Upload elements
-        this.frontInput = document.getElementById('front-input');
-        this.edgeInput = document.getElementById('edge-input');
-        this.frontPreview = document.getElementById('front-preview');
-        this.edgePreview = document.getElementById('edge-preview');
-        
-        // Buttons
-        this.frontCameraBtn = document.getElementById('front-camera-btn');
-        this.frontFileBtn = document.getElementById('front-file-btn');
-        this.edgeCameraBtn = document.getElementById('edge-camera-btn');
-        this.edgeFileBtn = document.getElementById('edge-file-btn');
-        this.analyzeBtn = document.getElementById('analyze-btn');
-        this.newAnalysisBtn = document.getElementById('new-analysis-btn');
-        
-        // Results section
-        this.resultsSection = document.getElementById('results-section');
-        this.coinName = document.getElementById('coin-name');
-        this.coinGrade = document.getElementById('coin-grade');
-        this.coinValue = document.getElementById('coin-value');
-        this.coinDetails = document.getElementById('coin-details');
-    }
+const TOAST_DURATIONS = { error: 8000, info: 4000, success: 4000 };
+let toastRegion = null;
 
-    bindEvents() {
-        // Front image events
-        this.frontCameraBtn.addEventListener('click', () => this.openCamera('front'));
-        this.frontFileBtn.addEventListener('click', () => this.openFileSelector('front'));
-        this.frontInput.addEventListener('change', (e) => this.handleImageUpload(e, 'front'));
+export function toast(message, kind = 'info') {
+  if (!toastRegion) {
+    toastRegion = document.getElementById('toast-region');
+  }
+  if (!toastRegion) return;
 
-        // Edge image events
-        this.edgeCameraBtn.addEventListener('click', () => this.openCamera('edge'));
-        this.edgeFileBtn.addEventListener('click', () => this.openFileSelector('edge'));
-        this.edgeInput.addEventListener('change', (e) => this.handleImageUpload(e, 'edge'));
+  const item = document.createElement('div');
+  item.className = `toast toast--${kind}`;
+  item.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  const bg = kind === 'error' ? '#f44336' : kind === 'success' ? '#4caf50' : '#2196f3';
+  item.style.cssText = `display:flex;align-items:flex-start;gap:0.5rem;padding:0.75rem 1rem;border-radius:6px;background:${bg};color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.2);`;
 
-        // Analysis events
-        this.analyzeBtn.addEventListener('click', () => this.analyzeCoin());
-        this.newAnalysisBtn.addEventListener('click', () => this.resetApp());
-    }
+  const text = document.createElement('span');
+  text.textContent = message;
+  item.appendChild(text);
 
-    openCamera(type) {
-        // For mobile devices, the file input with capture="environment" will open the camera
-        // Check if we're on a mobile device
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'toast-dismiss';
+  dismiss.setAttribute('aria-label', 'Dismiss');
+  dismiss.textContent = '\u00d7';
+  dismiss.style.cssText = 'background:transparent;border:none;color:inherit;font-size:1.25rem;line-height:1;cursor:pointer;padding:0;margin-left:auto;';
+  dismiss.addEventListener('click', () => item.remove());
+  item.appendChild(dismiss);
 
-        if (isMobile) {
-            // On mobile, directly open camera
-            if (type === 'front') {
-                this.frontInput.click();
-            } else {
-                this.edgeInput.click();
-            }
-        } else {
-            // On desktop, show a message or fallback to file upload
-            if (confirm('Camera access is optimized for mobile devices. Would you like to upload an image instead?')) {
-                this.openFileSelector(type);
-            }
-        }
-    }
+  toastRegion.appendChild(item);
 
-    openFileSelector(type) {
-        if (type === 'front') {
-            this.frontInput.click();
-        } else {
-            this.edgeInput.click();
-        }
-    }
-
-    handleImageUpload(event, type) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // Validate image type
-        if (!file.type.match('image.*')) {
-            alert('Please select an image file (JPEG, PNG, etc.)');
-            return;
-        }
-
-        // Validate image size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('Image size should be less than 5MB for optimal processing');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            if (type === 'front') {
-                this.frontPreview.src = e.target.result;
-                this.frontPreview.style.display = 'block';
-                this.frontImage = file;
-            } else {
-                this.edgePreview.src = e.target.result;
-                this.edgePreview.style.display = 'block';
-                this.edgeImage = file;
-            }
-
-            // Enable analyze button when both images are uploaded
-            if (this.frontImage && this.edgeImage) {
-                this.analyzeBtn.disabled = false;
-            }
-        };
-        reader.readAsDataURL(file);
-    }
-
-    async analyzeCoin() {
-        if (!this.frontImage && !this.edgeImage) {
-            alert('Please upload both front and edge images of the coin');
-            return;
-        }
-
-        // Show loading state
-        this.analyzeBtn.disabled = true;
-        this.analyzeBtn.textContent = 'Analyzing...';
-
-        try {
-            // Preprocess images before sending to AI
-            const processedImages = await this.preprocessImages();
-
-            // Call the AI analysis
-            const result = await this.getCoinAnalysis();
-
-            // Show results section
-            this.resultsSection.style.display = 'block';
-
-            if (!result.success || !result.coin) {
-                this.displayError(result.error);
-                this.resultsSection.scrollIntoView({ behavior: 'smooth' });
-                return;
-            }
-
-            const coin = result.coin;
-            this.displayResults({
-                name: coin.name || 'Unknown Coin',
-                grade: coin.grade || 'Unknown Grade',
-                value: coin.estimatedValue || 'Value Not Available',
-                details: coin.conditionDetails || 'No details available'
-            });
-
-            // Scroll to results
-            this.resultsSection.scrollIntoView({ behavior: 'smooth' });
-        } catch (error) {
-            console.error('Analysis error:', error);
-            alert('Error analyzing coin. Please try again.');
-        } finally {
-            this.analyzeBtn.disabled = false;
-            this.analyzeBtn.textContent = 'Analyze Coin';
-        }
-    }
-
-    async preprocessImages() {
-        // Import image processor for preprocessing
-        // In a real implementation, we would import the actual image processor
-        // For now, we'll simulate the preprocessing
-
-        // In a real implementation, we would do something like:
-        /*
-        const imageProcessor = new CoinImageProcessor();
-        const processedFront = await imageProcessor.processFrontImage(this.frontImage);
-        const processedEdge = await imageProcessor.processEdgeImage(this.edgeImage);
-        return imageProcessor.combineViews(processedFront, processedEdge);
-        */
-
-        // For this demo, return the original images with some metadata
-        return {
-            front: this.frontImage,
-            edge: this.edgeImage,
-            metadata: {
-                timestamp: new Date().toISOString(),
-                originalSizes: {
-                    front: this.frontImage ? this.frontImage.size : 0,
-                    edge: this.edgeImage ? this.edgeImage.size : 0
-                }
-            }
-        };
-    }
-
-    async getCoinAnalysis() {
-        const aiService = new CoinAIService();
-        return await aiService.identifyCoin(this.frontImage, this.edgeImage);
-    }
-
-    displayResults(result) {
-        this.coinName.textContent = result.name;
-        this.coinGrade.textContent = result.grade;
-        this.coinValue.textContent = result.value;
-        this.coinDetails.textContent = result.details;
-    }
-
-    displayError(errorMessage) {
-        this.coinName.textContent = 'Identification failed';
-        this.coinGrade.textContent = '—';
-        this.coinValue.textContent = '—';
-        this.coinDetails.textContent = (errorMessage ? errorMessage + '. ' : '') + 'No result was produced. Check that the local AI server is running and reachable, then try again with clearer images.';
-    }
-
-    resetApp() {
-        // Reset images
-        this.frontImage = null;
-        this.edgeImage = null;
-
-        // Reset previews
-        this.frontPreview.style.display = 'none';
-        this.edgePreview.style.display = 'none';
-
-        // Reset inputs
-        this.frontInput.value = '';
-        this.edgeInput.value = '';
-
-        // Disable analyze button
-        this.analyzeBtn.disabled = true;
-        this.analyzeBtn.textContent = 'Analyze Coin';
-
-        // Hide results section
-        this.resultsSection.style.display = 'none';
-    }
-
-    // Check if the app is running offline
-    checkOfflineStatus() {
-        // Update UI based on online/offline status
-        const updateOnlineStatus = () => {
-            const statusElement = document.createElement('div');
-            statusElement.id = 'online-status';
-            statusElement.style.position = 'fixed';
-            statusElement.style.top = '10px';
-            statusElement.style.right = '10px';
-            statusElement.style.padding = '5px 10px';
-            statusElement.style.borderRadius = '4px';
-            statusElement.style.fontSize = '14px';
-            statusElement.style.zIndex = '1000';
-
-            if (navigator.onLine) {
-                statusElement.textContent = 'Online';
-                statusElement.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
-                statusElement.style.color = 'white';
-            } else {
-                statusElement.textContent = 'Offline';
-                statusElement.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
-                statusElement.style.color = 'white';
-            }
-
-            // Remove any existing status element
-            const existingStatus = document.getElementById('online-status');
-            if (existingStatus) {
-                existingStatus.remove();
-            }
-
-            document.body.appendChild(statusElement);
-        };
-
-        // Initial check
-        updateOnlineStatus();
-
-        // Listen for online/offline events
-        window.addEventListener('online', updateOnlineStatus);
-        window.addEventListener('offline', updateOnlineStatus);
-    }
-
-    // Set up the install prompt for PWA
-    setupInstallPrompt() {
-        // Listen for the beforeinstallprompt event
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Prevent the mini-infobar from appearing on mobile
-            e.preventDefault();
-            // Stash the event so it can be triggered later
-            this.deferredPrompt = e;
-
-            // Show install button if available
-            const installBtn = document.createElement('button');
-            installBtn.id = 'install-pwa-btn';
-            installBtn.textContent = 'Install App';
-            installBtn.style.position = 'fixed';
-            installBtn.style.bottom = '20px';
-            installBtn.style.right = '20px';
-            installBtn.style.padding = '10px 15px';
-            installBtn.style.backgroundColor = '#2196f3';
-            installBtn.style.color = 'white';
-            installBtn.style.border = 'none';
-            installBtn.style.borderRadius = '5px';
-            installBtn.style.cursor = 'pointer';
-            installBtn.style.zIndex = '1000';
-            installBtn.style.display = 'none'; // Initially hidden
-
-            installBtn.addEventListener('click', () => {
-                // Show the install prompt
-                this.deferredPrompt.prompt();
-                // Wait for the user to respond to the prompt
-                this.deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('User accepted the install prompt');
-                    } else {
-                        console.log('User dismissed the install prompt');
-                    }
-                    this.deferredPrompt = null;
-                    installBtn.style.display = 'none';
-                });
-            });
-
-            document.body.appendChild(installBtn);
-
-            // Show the install button
-            const existingInstallBtn = document.getElementById('install-pwa-btn');
-            if (existingInstallBtn) {
-                existingInstallBtn.style.display = 'block';
-            }
-        });
-
-        // Listen for when the PWA is successfully installed
-        window.addEventListener('appinstalled', () => {
-            console.log('PWA was installed');
-            // Hide the install button after installation
-            const installBtn = document.getElementById('install-pwa-btn');
-            if (installBtn) {
-                installBtn.style.display = 'none';
-            }
-            this.deferredPrompt = null;
-        });
-    }
+  const duration = TOAST_DURATIONS[kind] ?? TOAST_DURATIONS.info;
+  let timer = window.setTimeout(() => item.remove(), duration);
+  dismiss.addEventListener('click', () => window.clearTimeout(timer), { once: true });
 }
 
-// Initialize the app when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new NumislensApp();
-});
+const NAV_ITEMS = [
+  { id: 'inventory', label: 'Inventory', hash: '#/', route: 'inventory' },
+  { id: 'sets', label: 'Sets', disabled: true },
+  { id: 'melt', label: 'Melt', disabled: true },
+  { id: 'settings', label: 'Settings', hash: '#/settings', route: 'settings' },
+];
+
+function buildShell() {
+  const app = document.getElementById('app');
+  if (!app) return null;
+
+  app.replaceChildren();
+
+  const header = document.createElement('header');
+  const nav = document.createElement('nav');
+  nav.className = 'top-nav';
+  nav.setAttribute('aria-label', 'Main');
+  nav.style.cssText = 'display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;';
+
+  for (const item of NAV_ITEMS) {
+    if (item.disabled) {
+      const span = document.createElement('span');
+      span.className = 'nav-item nav-item--disabled';
+      span.id = `nav-${item.id}`;
+      span.textContent = item.label;
+      span.title = 'Coming in Phase 3c';
+      span.setAttribute('aria-disabled', 'true');
+      span.setAttribute('aria-label', `${item.label} — Coming in Phase 3c`);
+      span.style.cssText = 'opacity:0.5;cursor:not-allowed;';
+      nav.appendChild(span);
+    } else {
+      const link = document.createElement('a');
+      link.className = 'nav-item';
+      link.id = `nav-${item.id}`;
+      link.href = item.hash;
+      link.textContent = item.label;
+      link.dataset.route = item.route;
+      nav.appendChild(link);
+    }
+  }
+
+  header.appendChild(nav);
+  app.appendChild(header);
+
+  const main = document.createElement('main');
+  const viewEl = document.createElement('div');
+  viewEl.id = 'view';
+  main.appendChild(viewEl);
+  app.appendChild(main);
+
+  let region = document.getElementById('toast-region');
+  if (!region) {
+    region = document.createElement('div');
+    region.id = 'toast-region';
+    region.className = 'toast-region';
+    region.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:1000;display:flex;flex-direction:column;gap:0.5rem;max-width:min(24rem,calc(100vw - 2rem));';
+    region.setAttribute('aria-live', 'polite');
+    region.setAttribute('aria-atomic', 'false');
+    document.body.appendChild(region);
+  }
+  toastRegion = region;
+
+  return viewEl;
+}
+
+function setActiveNav(routeName) {
+  const activeRoute = routeName === 'coin' ? 'inventory' : routeName;
+  for (const item of NAV_ITEMS) {
+    if (item.disabled || !item.route) continue;
+    const el = document.getElementById(`nav-${item.id}`);
+    if (!el) continue;
+    const isActive = item.route === activeRoute;
+    el.classList.toggle('nav-item--active', isActive);
+    if (el.tagName === 'A') {
+      el.style.fontWeight = isActive ? 'bold' : '';
+      el.style.textDecoration = isActive ? 'underline' : '';
+    }
+    if (isActive) {
+      el.setAttribute('aria-current', 'page');
+    } else {
+      el.removeAttribute('aria-current');
+    }
+  }
+}
+
+function renderConnectPrompt(viewEl) {
+  viewEl.replaceChildren();
+
+  const heading = document.createElement('h2');
+  heading.textContent = 'Connect to your daemon';
+  viewEl.appendChild(heading);
+
+  const text = document.createElement('p');
+  text.textContent = 'Enter your daemon bearer token in Settings to get started.';
+  viewEl.appendChild(text);
+
+  const link = document.createElement('a');
+  link.href = '#/settings';
+  link.className = 'btn';
+  link.textContent = 'Go to Settings';
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    navigate('#/settings');
+  });
+  viewEl.appendChild(link);
+}
+
+function onRoute(route) {
+  const viewEl = document.getElementById('view');
+  if (!viewEl) return;
+
+  setActiveNav(route.name);
+
+  if (!api.getToken() && route.name !== 'settings') {
+    renderConnectPrompt(viewEl);
+    return;
+  }
+
+  switch (route.name) {
+    case 'inventory':
+      renderInventory(viewEl);
+      break;
+    case 'coin':
+      renderCoin(viewEl, route.params.accession);
+      break;
+    case 'settings':
+      renderSettings(viewEl);
+      break;
+    default:
+      renderInventory(viewEl);
+  }
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+function init() {
+  buildShell();
+  initRouter(onRoute);
+
+  window.addEventListener('numislens:unauthorized', () => {
+    toast('Session expired or token invalid — please re-enter your token', 'error');
+    navigate('#/settings');
+  });
+
+  registerServiceWorker();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

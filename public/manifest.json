@@ -1,7 +1,7 @@
 {
-  "name": "Numislens - AI Coin Identifier",
-  "short_name": "Numislens",
-  "description": "AI-powered coin identification and grading application",
+  "name": "NumisLens",
+  "short_name": "NumisLens",
+  "description": "Thin client for the NumisLens coin-collection daemon",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
