@@ -18,10 +18,8 @@ CROSSCHECK_SOURCE = "yahoo"
 DISAGREE_PCT = 2.0
 STALE_HOURS = 48
 HTTP_TIMEOUT = 10
-YAHOO_USER_AGENT = (
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-)
+# Yahoo 429s the ubiquitous "Chrome/120.0.0.0" scraper UA; this shorter UA passes.
+YAHOO_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
 
 
 class SpotError(Exception):
