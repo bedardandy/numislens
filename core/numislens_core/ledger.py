@@ -12,6 +12,7 @@ from .manifests import load_manifest
 GRADE_BUCKETS = frozenset({"AG", "G", "VG", "F", "VF", "XF", "AU", "UNC", "PROOF"})
 GRADE_SOURCES = frozenset({"local-vlm", "cross-vote", "cloud", "human", "tpg"})
 VALUE_BASES = frozenset({"melt", "numismatic", "hybrid"})
+IMAGE_KINDS = frozenset({"obverse", "reverse", "edge", "slab"})
 
 
 class LedgerError(Exception):
@@ -494,6 +495,59 @@ class Ledger:
             (coin_id,),
         ).fetchone()
         return _row_to_dict(row)
+
+    def add_image(
+        self,
+        accession: str,
+        kind: str,
+        content_hash: str,
+        path: str,
+    ) -> dict:
+        """Record a coin image row (idempotent on content_hash per coin).
+
+        Returns the coin_images row as a dict. If a row with the same
+        (coin_id, content_hash) already exists it is returned unchanged and no
+        new row is inserted (content-hash dedup); the caller can detect this by
+        comparing the returned kind/path to what it passed in.
+        """
+        if kind not in IMAGE_KINDS:
+            raise ValueError(f"invalid image kind: {kind!r}")
+        if not content_hash:
+            raise ValueError("content_hash must be non-empty")
+        coin_id = self._coin_id(accession)
+        existing = self.conn.execute(
+            """
+            SELECT * FROM coin_images
+            WHERE coin_id = ? AND content_hash = ?
+            ORDER BY id LIMIT 1
+            """,
+            (coin_id, content_hash),
+        ).fetchone()
+        if existing is not None:
+            return dict(existing)
+        now = _utcnow()
+        with self.conn:
+            self.conn.execute("PRAGMA foreign_keys = ON")
+            cur = self.conn.execute(
+                """
+                INSERT INTO coin_images (coin_id, kind, content_hash, path, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (coin_id, kind, content_hash, path, now),
+            )
+            image_id = cur.lastrowid
+        row = self.conn.execute(
+            "SELECT * FROM coin_images WHERE id = ?", (image_id,)
+        ).fetchone()
+        return dict(row)
+
+    def list_images(self, accession: str) -> list[dict]:
+        coin_id = self._coin_id(accession)
+        rows = self.conn.execute(
+            "SELECT * FROM coin_images WHERE coin_id = ? ORDER BY id",
+            (coin_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def move_coin(self, accession: str, location_id: int) -> None:
         coin_id = self._coin_id(accession)

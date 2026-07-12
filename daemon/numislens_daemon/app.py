@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from .auth import require_token
 from .config import Settings, resolve_token
 from .errors import register_error_handlers
+from .routers import coins, locations, melt, sets
 
 
 def create_app(
@@ -43,6 +44,11 @@ def create_app(
     @router.get("/health", tags=["meta"])
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    router.include_router(coins.router)
+    router.include_router(locations.router)
+    router.include_router(sets.router)
+    router.include_router(melt.router)
 
     app.include_router(router)
     register_error_handlers(app)

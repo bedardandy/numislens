@@ -315,6 +315,34 @@ def portfolio_melt(conn: sqlite3.Connection) -> dict:
     }
 
 
+def portfolio_value(conn: sqlite3.Connection) -> dict:
+    """Portfolio valuation: melt (total + per-metal) and estimated value sums.
+
+    Pure read aggregation. ``melt`` reuses :func:`portfolio_melt`; the estimated
+    numismatic/hybrid value is summed from ``coins.value_est_cents`` grouped by
+    ``value_basis`` (a NULL basis is bucketed as ``"unspecified"``).
+    """
+    melt = portfolio_melt(conn)
+    rows = conn.execute(
+        """
+        SELECT value_basis, COUNT(*) AS n, COALESCE(SUM(value_est_cents), 0) AS s
+        FROM coins
+        WHERE value_est_cents IS NOT NULL
+        GROUP BY value_basis
+        """
+    ).fetchall()
+    by_basis: dict[str, dict] = {}
+    for row in rows:
+        basis = row["value_basis"] or "unspecified"
+        by_basis[basis] = {"count": row["n"], "value_cents": int(row["s"])}
+    value_est_total_cents = sum(v["value_cents"] for v in by_basis.values())
+    return {
+        "melt": melt,
+        "value_est_by_basis": by_basis,
+        "value_est_total_cents": value_est_total_cents,
+    }
+
+
 def melt_delta(conn: sqlite3.Connection, days: int = 1) -> dict:
     result: dict[str, dict] = {}
 

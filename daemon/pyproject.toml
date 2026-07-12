@@ -22,7 +22,7 @@ dev = ["pytest", "httpx"]
 numislens-daemon = "numislens_daemon.__main__:main"
 
 [tool.setuptools]
-packages = ["numislens_daemon"]
+packages = ["numislens_daemon", "numislens_daemon.routers"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

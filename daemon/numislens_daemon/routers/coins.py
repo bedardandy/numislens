@@ -1,0 +1,136 @@
+"""Coin resource endpoints."""
+
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from numislens_core import Ledger
+
+from ..deps import get_ledger
+from ..schemas import AppraiseBody, CoinCreate, MoveBody
+from ..serializers import serialize_coin
+
+router = APIRouter()
+
+LedgerDep = Annotated[Ledger, Depends(get_ledger)]
+
+_CONTENT_TYPE_EXT = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
+
+
+@router.post("/coins", status_code=status.HTTP_201_CREATED, tags=["coins"])
+def create_coin(body: CoinCreate, ldb: LedgerDep) -> dict | None:
+    accession = ldb.add_coin(**body.model_dump(exclude_unset=True, exclude_none=True))
+    return serialize_coin(ldb.get_coin(accession))
+
+
+@router.get("/coins", tags=["coins"])
+def list_coins(
+    ldb: LedgerDep,
+    series: str | None = None,
+    year: int | None = None,
+    mintmark: str | None = None,
+    denomination: str | None = None,
+    grade_bucket: str | None = None,
+    composition_id: int | None = None,
+    location_id: int | None = None,
+) -> list[dict | None]:
+    filters = {
+        k: v
+        for k, v in {
+            "series": series,
+            "year": year,
+            "mintmark": mintmark,
+            "denomination": denomination,
+            "grade_bucket": grade_bucket,
+            "composition_id": composition_id,
+            "location_id": location_id,
+        }.items()
+        if v is not None
+    }
+    results = ldb.find_coins(**filters)
+    return [serialize_coin(c) for c in results]
+
+
+@router.get("/coins/{accession}", tags=["coins"])
+def get_coin(accession: str, ldb: LedgerDep) -> dict | None:
+    coin = ldb.get_coin(accession)
+    if coin is None:
+        raise HTTPException(status_code=404, detail=f"coin not found: {accession}")
+    return serialize_coin(coin)
+
+
+@router.post("/coins/{accession}/move", tags=["coins"])
+def move_coin(accession: str, body: MoveBody, ldb: LedgerDep) -> dict | None:
+    ldb.move_coin(accession, body.location_id)
+    return serialize_coin(ldb.get_coin(accession))
+
+
+@router.post("/coins/{accession}/appraise", tags=["coins"])
+def appraise_coin(accession: str, body: AppraiseBody, ldb: LedgerDep) -> dict:
+    appraisal_kwargs = {
+        k: v
+        for k, v in body.model_dump(exclude={"appraised_by"}).items()
+        if v is not None
+    }
+    appraisal_id = ldb.record_appraisal(
+        accession, body.appraised_by, **appraisal_kwargs
+    )
+    return {
+        "appraisal_id": appraisal_id,
+        "coin": serialize_coin(ldb.get_coin(accession)),
+    }
+
+
+@router.post("/coins/{accession}/images", tags=["coins"])
+def upload_coin_images(
+    accession: str,
+    request: Request,
+    ldb: LedgerDep,
+    obverse: UploadFile | None = File(None),
+    reverse: UploadFile | None = File(None),
+    edge: UploadFile | None = File(None),
+    slab: UploadFile | None = File(None),
+) -> dict:
+    if ldb.get_coin(accession) is None:
+        raise HTTPException(status_code=404, detail=f"coin not found: {accession}")
+
+    images_dir = Path(request.app.state.images_dir)
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    results: list[dict] = []
+    for kind, upload in (
+        ("obverse", obverse),
+        ("reverse", reverse),
+        ("edge", edge),
+        ("slab", slab),
+    ):
+        if upload is None:
+            continue
+        if upload.content_type is None or not upload.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"{kind}: not an image content-type: {upload.content_type}",
+            )
+        # Sync endpoint + sync get_ledger dependency run in the same worker
+        # thread, so the SQLite connection is used from its creating thread.
+        # Read the underlying spooled file synchronously (no await).
+        data = upload.file.read()
+        digest = hashlib.sha256(data).hexdigest()
+        ext = _CONTENT_TYPE_EXT.get(
+            upload.content_type, upload.content_type.split("/")[-1]
+        )
+        dest = images_dir / f"{digest}.{ext}"
+        if not dest.exists():
+            dest.write_bytes(data)
+        rec = ldb.add_image(accession, kind, digest, str(dest))
+        results.append(rec)
+
+    return {"images": results}
