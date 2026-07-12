@@ -28,3 +28,43 @@ The melt service exits non-zero on source disagreement (>2%), staleness (>48h), 
 ## Backups
 
 See [ops/BACKUP.md](BACKUP.md) for Litestream replication and dump-based backup/restore.
+
+## NumisLens daemon (Phase 2a)
+
+Install the daemon package (console script `numislens-daemon`):
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e core -e daemon
+# or: pipx install -e core -e daemon
+```
+
+Generate a bearer token and store it in `NUMISLENS_TOKEN` or in `~/.config/numislens/token` (chmod 600):
+
+```bash
+python3 -c "import secrets;print(secrets.token_urlsafe(32))"
+```
+
+For the systemd unit below, put the token in `~/.config/numislens/daemon.env` as `NUMISLENS_TOKEN=...` (chmod 600 that file).
+
+Run manually (binds localhost only):
+
+```bash
+numislens-daemon --db PATH --host 127.0.0.1 --port 8000
+```
+
+The daemon listens on `127.0.0.1` and must **never** be port-forwarded raw to the internet.
+
+Expose over Tailscale (TLS on your tailnet; cloud assistants use the bearer token):
+
+```bash
+tailscale serve --bg 8000
+```
+
+Install the user unit (not enabled by this repo):
+
+```bash
+cp ops/systemd/numislens-daemon.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now numislens-daemon
+```
