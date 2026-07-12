@@ -188,3 +188,11 @@ export function portfolioValue() {
 export function updateMelt() {
   return apiFetch('/api/v1/melt/update', { method: 'POST' });
 }
+
+export function getAppraisalReport(top = 10) {
+  return apiFetch(`/api/v1/report/appraisal?top=${encodeURIComponent(top)}`);
+}
+
+export function getAppraisalReportPdf(top = 10) {
+  return fetchBlob(`/api/v1/report/appraisal.pdf?top=${encodeURIComponent(top)}`);
+}

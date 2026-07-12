@@ -20,6 +20,7 @@ const PRECACHE_URLS = [
   '/js/views/locations.js',
   '/js/views/sets.js',
   '/js/views/melt.js',
+  '/js/views/report.js',
   '/js/views/cyclecount.js',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',

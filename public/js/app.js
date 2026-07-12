@@ -7,6 +7,7 @@ import { renderAdd } from './views/add.js';
 import { renderLocations } from './views/locations.js';
 import { renderSets, renderSetBoard } from './views/sets.js';
 import { renderMelt } from './views/melt.js';
+import { renderReport } from './views/report.js';
 import { renderCycleCount } from './views/cyclecount.js';
 import { replayMoveQueue, queuedMoveCount } from './offline.js';
 
@@ -77,6 +78,7 @@ const NAV_ITEMS = [
   { id: 'add', label: 'Add', hash: '#/add', route: 'add', group: 'primary' },
   { id: 'sets', label: 'Sets', hash: '#/sets', route: 'sets', group: 'more' },
   { id: 'melt', label: 'Melt', hash: '#/melt', route: 'melt', group: 'more' },
+  { id: 'report', label: 'Report', hash: '#/report', route: 'report', group: 'more' },
   { id: 'locations', label: 'Locations', hash: '#/locations', route: 'locations', group: 'more' },
   { id: 'settings', label: 'Settings', hash: '#/settings', route: 'settings', group: 'more' },
 ];
@@ -258,6 +260,9 @@ function onRoute(route) {
     case 'melt':
       renderMelt(viewEl);
       break;
+    case 'report':
+      renderReport(viewEl);
+      break;
     case 'coin':
       renderCoin(viewEl, route.params.accession);
       break;
@@ -295,8 +300,10 @@ function init() {
   runReplay();
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 }

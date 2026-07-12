@@ -12,6 +12,7 @@ from .ledger import (
     UnknownSeries,
 )
 from .manifests import ManifestError, load_manifest, validate_manifest
+from .report import build_appraisal_report, face_value_cents
 
 __version__ = "0.1.0"
 __all__ = [
@@ -30,4 +31,6 @@ __all__ = [
     "load_manifest",
     "validate_manifest",
     "ManifestError",
+    "build_appraisal_report",
+    "face_value_cents",
 ]

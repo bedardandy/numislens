@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .auth import require_token
 from .config import Settings, resolve_token
 from .errors import register_error_handlers
-from .routers import coins, labels, locations, melt, sets, watch
+from .routers import coins, labels, locations, melt, report, sets, watch
 
 
 def create_app(
@@ -51,6 +51,7 @@ def create_app(
     router.include_router(sets.router)
     router.include_router(melt.router)
     router.include_router(labels.router)
+    router.include_router(report.router)
     router.include_router(watch.router)
 
     app.include_router(router)
