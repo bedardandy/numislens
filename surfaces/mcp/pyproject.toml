@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "numislens-mcp"
+version = "0.1.0"
+description = "NumisLens MCP server (Model Context Protocol) over the REST daemon"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]",
+    "httpx",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "respx",
+]
+
+[project.scripts]
+numislens-mcp = "numislens_mcp.__main__:main"
+
+[tool.setuptools]
+packages = ["numislens_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
