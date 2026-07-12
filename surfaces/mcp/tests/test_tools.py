@@ -210,7 +210,7 @@ async def test_get_label_pdf_requires_exactly_one() -> None:
 async def test_quick_add_posts_text_and_relays_unresolved() -> None:
     payload = {
         "parsed": {"year": 1943, "series": "Lincoln Wheat Cent"},
-        "unresolved": ["box 9"],
+        "unresolved": ["box 9", 'unrecognized: "shiny"'],
         "created": "NL-000007",
         "coin": {"accession_no": "NL-000007"},
     }
@@ -218,13 +218,15 @@ async def test_quick_add_posts_text_and_relays_unresolved() -> None:
         route = mock.post("/api/v1/coins/quick").mock(
             return_value=Response(200, json=payload)
         )
-        result = await quick_add("1943 steel cent, box 9")
+        result = await quick_add("1943 shiny steel cent, box 9")
         assert route.called
         body = json.loads(route.calls.last.request.content)
-        assert body == {"text": "1943 steel cent, box 9"}
+        assert body == {"text": "1943 shiny steel cent, box 9"}
     parsed = json.loads(result)
     assert parsed["created"] == "NL-000007"
-    assert parsed["unresolved"] == ["box 9"]
+    # Both flavors survive verbatim for the model to relay: the unmapped
+    # location AND the unrecognized-leftover-text entry.
+    assert parsed["unresolved"] == ["box 9", 'unrecognized: "shiny"']
 
 
 async def test_quick_add_422_relays_detail() -> None:

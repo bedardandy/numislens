@@ -66,11 +66,18 @@ status:
 ```json
 {
   "parsed": { "...": "fields written to the ledger" },
-  "unresolved": ["box 9", "composition"],
+  "unresolved": ["box 9", "composition", "unrecognized: \"shiny\""],
   "created": "NL-000042",
   "coin": { "accession_no": "NL-000042", "value_est_display": null, ... }
 }
 ```
+
+`unresolved` carries two kinds of entries: things the parser recognized but could
+not map (an unknown location, an uncertain composition, a malformed amount) **and**
+`unrecognized: "..."` entries echoing any leftover dictated text the parser could
+not consume (an unknown word, a second year, a floating mint letter). Speaking the
+whole list — as step 10 below does — tells you exactly which words of your
+dictation were ignored.
 
 **Failure** (HTTP 422 when neither series nor year parsed): body includes `detail` with
 `message`, `parsed`, and `unresolved` — **no coin is created**.
@@ -105,8 +112,9 @@ status:
           **Combine Text** with separator `, ` → **Unresolved speech**.
      9. **Text** — template: `Added coin ` + **created** (step 6) + `. Unresolved: ` +
         **Unresolved speech** (step 8).
-     10. **Speak Text** — speak the Text from step 9 (user hears accession and every
-         unresolved phrase).
+     10. **Speak Text** — speak the Text from step 9 (user hears the accession, every
+         unresolved phrase, and every `unrecognized: "..."` leftover-text entry — so
+         nothing you dictated is silently ignored).
    - **Otherwise** (error branch):
      11. **If** → Contents of URL → **Dictionary** → **Has Key** → `detail`
          - **Then:** **Get Dictionary Value** Key `detail` → **Show Alert** (title

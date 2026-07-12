@@ -257,7 +257,7 @@
           "coins"
         ],
         "summary": "Quick Add Coin",
-        "description": "Deterministically parse free text and create a coin if it is safe to.\n\nNO LLM, NO guessing. The coin is created only when at least a series or a\nyear parsed cleanly; otherwise this responds 422 with what it did and did\nnot understand. Composition is set only by numismatically CERTAIN rules;\ngrade is never parsed. Unmapped phrases (unknown locations, uncertain\ncompositions, malformed money) are returned in ``unresolved`` — a mentioned\nlocation that does not already exist is listed there, NOT auto-created.",
+        "description": "Deterministically parse free text and create a coin if it is safe to.\n\nNO LLM, NO guessing. The coin is created only when at least a series or a\nyear parsed cleanly; otherwise this responds 422 with what it did and did\nnot understand. Composition is set only by numismatically CERTAIN rules;\ngrade is never parsed. Unmapped phrases (unknown locations, uncertain\ncompositions, malformed money) are returned in ``unresolved`` — a mentioned\nlocation that does not already exist is listed there, NOT auto-created.\nAny leftover input text no extractor consumed (unknown words, extra year\ntokens beyond the first) is echoed back in ``unresolved`` as\n``unrecognized: \"...\"`` entries, so nothing is silently dropped.",
         "operationId": "quick_add_coin_api_v1_coins_quick_post",
         "requestBody": {
           "content": {

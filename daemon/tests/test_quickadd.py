@@ -71,10 +71,13 @@ def test_space_separated_mint_after_year(client, auth_headers):
 
 
 def test_floating_mint_token_is_not_a_mintmark(client, auth_headers):
-    # "CC" with no year/series adjacency must NOT become a mintmark.
+    # "CC" with no year/series adjacency must NOT become a mintmark — and it
+    # must be reported back as unrecognized text, never silently dropped.
     resp = _quick(client, auth_headers, "CC 1900 washington quarter")
     assert resp.status_code == 200
-    assert "mintmark" not in resp.json()["parsed"]
+    body = resp.json()
+    assert "mintmark" not in body["parsed"]
+    assert 'unrecognized: "cc"' in body["unresolved"]
 
 
 def test_garbage_input_refuses_422(client, auth_headers):
@@ -155,6 +158,52 @@ def test_ambiguous_location_unresolved(client, auth_headers):
     body = resp.json()
     assert "location_id" not in body["parsed"]
     assert "box 3" in body["unresolved"]
+
+
+def test_steel_rule_is_year_gated(client, auth_headers):
+    # No 1957 steel cent exists: the steel rule must NOT fire on an impossible
+    # year — composition stays null and is listed unresolved (user misspoke).
+    resp = _quick(client, auth_headers, "1957 steel cent")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["parsed"]["year"] == 1957
+    assert body["parsed"]["series"] == "Lincoln Wheat Cent"
+    assert "composition_id" not in body["parsed"]
+    assert "composition" in body["unresolved"]
+
+    # Year absent -> the word "steel" alone still names the metal (certain).
+    resp2 = _quick(client, auth_headers, "steel cent")
+    assert resp2.status_code == 200
+    assert "composition_id" in resp2.json()["parsed"]
+    assert "composition" not in resp2.json()["unresolved"]
+
+
+def test_unconsumed_text_reported_unrecognized(client, auth_headers):
+    # "shoebox" is not a known location kind: the phrase must surface as an
+    # unrecognized entry, not vanish silently.
+    resp = _quick(client, auth_headers, "1885 Morgan dollar, shoebox 9")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "location_id" not in body["parsed"]
+    assert 'unrecognized: "shoebox 9"' in body["unresolved"]
+
+    # Unknown series word ("Buffalo") is echoed back too.
+    resp2 = _quick(client, auth_headers, "CC 1936 Buffalo nickel")
+    assert resp2.status_code == 200
+    body2 = resp2.json()
+    assert body2["parsed"]["year"] == 1936
+    assert "mintmark" not in body2["parsed"]
+    assert 'unrecognized: "cc"' in body2["unresolved"]
+    assert 'unrecognized: "buffalo"' in body2["unresolved"]
+
+
+def test_second_year_candidate_reported_unrecognized(client, auth_headers):
+    # Multiple 4-digit years: the first is the year; the rest are surfaced.
+    resp = _quick(client, auth_headers, "1943 cent bought 1999")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["parsed"]["year"] == 1943
+    assert 'unrecognized: "1999"' in body["unresolved"]
 
 
 def test_unknown_field_rejected_422(client, auth_headers):

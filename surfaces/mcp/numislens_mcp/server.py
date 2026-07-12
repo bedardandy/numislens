@@ -182,11 +182,15 @@ async def quick_add(text: str) -> str:
     CONTRACT — always read the response's ``unresolved`` array and relay it to
     the user. It lists anything recognized but not mapped: a location that does
     not already exist (it is NOT auto-created — create it first, then re-add or
-    move the coin), an uncertain composition, or a malformed amount. If neither
-    a series nor a year could be parsed the call returns a 422 error describing
-    what was and was not understood, and NO coin is created. Grade is never
-    parsed. The response is ``{parsed, unresolved, created, coin}`` where
-    ``created`` is the new accession number (or the call errored).
+    move the coin), an uncertain composition, or a malformed amount. It ALSO
+    echoes back any leftover text the parser could not consume as
+    ``unrecognized: "..."`` entries (unknown words, a second year token, a
+    floating mint letter) — relay those too so the user knows exactly what was
+    ignored. If neither a series nor a year could be parsed the call returns a
+    422 error describing what was and was not understood, and NO coin is
+    created. Grade is never parsed. The response is
+    ``{parsed, unresolved, created, coin}`` where ``created`` is the new
+    accession number (or the call errored).
     """
     try:
         result = await _client().request_json(

@@ -43,6 +43,9 @@ def quick_add_coin(body: QuickAddBody, ldb: LedgerDep) -> dict:
     grade is never parsed. Unmapped phrases (unknown locations, uncertain
     compositions, malformed money) are returned in ``unresolved`` — a mentioned
     location that does not already exist is listed there, NOT auto-created.
+    Any leftover input text no extractor consumed (unknown words, extra year
+    tokens beyond the first) is echoed back in ``unresolved`` as
+    ``unrecognized: "..."`` entries, so nothing is silently dropped.
     """
     series_names = [
         row["series"]

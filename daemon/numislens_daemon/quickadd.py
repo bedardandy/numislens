@@ -10,7 +10,9 @@ into ledger fields using ONLY regex and lookup tables — NO LLM, NO network, NO
 guessing. Every rule below is either a fact literally stated in the text (a year
 token, a denomination word, a "$" amount) or a numismatically CERTAIN
 consequence of such a fact. Anything it cannot map cleanly is returned in
-``unresolved`` rather than fabricated. Grade is never parsed or set.
+``unresolved`` rather than fabricated, and any input text the parser could not
+consume is echoed back as ``unrecognized: "..."`` entries so nothing is silently
+dropped. Grade is never parsed or set.
 
 The LLM enrichment tier described in the direction doc (Gemma micro-call) is a
 LATER phase; this module deliberately layers underneath it.
@@ -21,11 +23,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
+Span = tuple[int, int]
+
 # --- Mintmarks -------------------------------------------------------------
 # The U.S. mintmark alphabet we accept. A single letter/pair only counts as a
 # mintmark when it is ADJACENT to a year ("1885-CC", "1885 CC") or to a matched
 # series phrase ("Morgan dollar CC"). A bare "CC" floating in the text is NOT a
-# mintmark (it could be anything) and is ignored.
+# mintmark (it could be anything); it is reported back as unrecognized text.
 _MINTMARKS = {"P", "D", "S", "O", "CC", "W"}
 _MINT_LOWER = {m.lower() for m in _MINTMARKS}
 
@@ -84,14 +88,25 @@ _LOCATION_KINDS = {
     "drawer", "folder", "binder", "tube", "case", "shelf", "bin", "sleeve",
 }
 
-_YEAR_RE = re.compile(r"(1[5-9]\d\d|20\d\d)")
+# --- Filler words ----------------------------------------------------------
+# Connective tissue that carries no coin fact. Stripped from residual segments
+# before they are reported as unrecognized (so "bought 1999" reports "1999",
+# not the verb). Keep this list conservative: when in doubt, report the word.
+_FILLER_WORDS = {
+    "a", "an", "the", "and", "add", "added", "to", "in", "into", "on", "at",
+    "of", "for", "my", "it", "is", "this", "that", "just", "please", "put",
+    "with", "from", "i", "coin", "coins", "paid", "bought", "cost", "get",
+    "got", "new",
+}
+
 _YEAR_WORD_RE = re.compile(r"\b(1[5-9]\d\d|20\d\d)\b")
 _YEAR_MINT_RE = re.compile(r"\b(1[5-9]\d\d|20\d\d)-([a-z]{1,2})\b")
-# "$4", "$1,234.56", or "paid/cost 4.50". A trailing "$" amount is the strongest
-# signal; the paid/cost keywords let a bare number through.
+# "$4", "$1,234.56", or "paid/cost 4.50". The paid/cost-keyword branch is tried
+# first so the span covers the whole "paid $4" phrase; a bare "$" amount is
+# still matched on its own.
 _MONEY_RE = re.compile(
-    r"(?:\$\s*(?P<dollar>\d[\d,]*(?:\.\d{1,2})?))"
-    r"|(?:\b(?:paid|cost)\s+\$?\s*(?P<kw>\d[\d,]*(?:\.\d{1,2})?))"
+    r"(?:\b(?:paid|cost)\s+\$?\s*(?P<kw>\d[\d,]*(?:\.\d{1,2})?))"
+    r"|(?:\$\s*(?P<dollar>\d[\d,]*(?:\.\d{1,2})?))"
 )
 
 
@@ -106,13 +121,13 @@ def _money_to_cents(raw: str) -> int:
     return int(dollars_part) * 100 + int(cents_part)
 
 
-def _extract_money(text: str) -> tuple[int | None, str | None, tuple[int, int] | None]:
-    """Return (cents, unresolved_fragment, span). span is blanked before year
-    parsing so a "$1943" price is never mistaken for a year."""
+def _extract_money(text: str) -> tuple[int | None, str | None, Span | None]:
+    """Return (cents, unresolved_fragment, span). The span is masked before
+    year parsing so a "$1943" price is never mistaken for a year."""
     m = _MONEY_RE.search(text)
     if m is None:
         return None, None, None
-    raw = m.group("dollar") if m.group("dollar") is not None else m.group("kw")
+    raw = m.group("kw") if m.group("kw") is not None else m.group("dollar")
     try:
         return _money_to_cents(raw), None, m.span()
     except ValueError:
@@ -121,8 +136,8 @@ def _extract_money(text: str) -> tuple[int | None, str | None, tuple[int, int] |
 
 def _match_series(
     lowered: str, series_names: list[str]
-) -> tuple[str | None, str | None]:
-    """Return (canonical_series, matched_phrase). Longest phrase wins."""
+) -> tuple[str | None, str | None, Span | None]:
+    """Return (canonical_series, matched_phrase, span). Longest phrase wins."""
     candidates: dict[str, str] = {}
     for name in series_names:
         if name:
@@ -131,45 +146,55 @@ def _match_series(
     for phrase, canonical in _SERIES_ALIASES.items():
         candidates.setdefault(phrase, canonical)
     for phrase in sorted(candidates, key=len, reverse=True):
-        if re.search(r"\b" + re.escape(phrase) + r"\b", lowered):
-            return candidates[phrase], phrase
-    return None, None
+        m = re.search(r"\b" + re.escape(phrase) + r"\b", lowered)
+        if m is not None:
+            return candidates[phrase], phrase, m.span()
+    return None, None, None
 
 
-def _match_denomination(lowered: str) -> str | None:
+def _match_denomination(lowered: str) -> tuple[str | None, Span | None]:
     for phrase, canonical in _DENOMINATIONS:
-        if re.search(r"\b" + re.escape(phrase) + r"\b", lowered):
-            return canonical
-    return None
+        m = re.search(r"\b" + re.escape(phrase) + r"\b", lowered)
+        if m is not None:
+            return canonical, m.span()
+    return None, None
 
 
 def _extract_year_and_mint(
     text_lower: str, series_phrase: str | None
-) -> tuple[int | None, str | None]:
+) -> tuple[int | None, str | None, list[Span]]:
+    """Return (year, mintmark, consumed_spans).
+
+    Only the FIRST year candidate becomes the year; any later year tokens are
+    left unconsumed so the residual pass reports them as unrecognized (never
+    silently dropped).
+    """
     year: int | None = None
     mintmark: str | None = None
+    spans: list[Span] = []
 
     # 1. Combined "1885-CC" token.
     ym = _YEAR_MINT_RE.search(text_lower)
-    work = text_lower
     if ym is not None and ym.group(2) in _MINT_LOWER:
         year = int(ym.group(1))
         mintmark = ym.group(2).upper()
-        # Normalize so the space-separated pass does not double-count.
-        work = f"{text_lower[:ym.start()]} {ym.group(1)} {text_lower[ym.end():]}"
+        spans.append(ym.span())
     else:
         yw = _YEAR_WORD_RE.search(text_lower)
         if yw is not None:
             year = int(yw.group(1))
-
-    # 2. "1885 CC" — mint token immediately after the year token.
-    if mintmark is None and year is not None:
-        tokens = re.findall(r"[a-z]+|\d{3,4}", work)
-        ystr = str(year)
-        for i, tok in enumerate(tokens):
-            if tok == ystr and i + 1 < len(tokens) and tokens[i + 1] in _MINT_LOWER:
-                mintmark = tokens[i + 1].upper()
-                break
+            spans.append(yw.span())
+            # 2. "1885 CC" — mint token immediately after the year token.
+            tokens = [
+                (t.group(0), t.span())
+                for t in re.finditer(r"[a-z]+|\d{3,4}", text_lower)
+            ]
+            for i, (_tok, sp) in enumerate(tokens):
+                if sp == yw.span():
+                    if i + 1 < len(tokens) and tokens[i + 1][0] in _MINT_LOWER:
+                        mintmark = tokens[i + 1][0].upper()
+                        spans.append(tokens[i + 1][1])
+                    break
 
     # 3. "Morgan dollar CC" — mint token immediately after the series phrase.
     if mintmark is None and series_phrase is not None:
@@ -178,8 +203,9 @@ def _extract_year_and_mint(
         )
         if m is not None and m.group(1) in _MINT_LOWER:
             mintmark = m.group(1).upper()
+            spans.append(m.span(1))
 
-    return year, mintmark
+    return year, mintmark, spans
 
 
 def _certain_composition(
@@ -188,16 +214,23 @@ def _certain_composition(
     """Return (composition_name, uncertain).
 
     Only numismatically CERTAIN rules fire. ``uncertain`` is True when a
-    composition is plausible but not certain (a silver-dollar series without a
-    qualifying year) so the caller lists it in ``unresolved`` instead of guessing.
+    composition is plausible but not certain, so the caller lists it in
+    ``unresolved`` instead of guessing.
 
-    - steel cent: the word "steel" names the metal (1943 zinc-coated steel).
+    - steel cent: the word "steel" names the metal, but the only regular-issue
+      steel cent is 1943 — so the rule fires only when the year is absent or
+      exactly 1943. Any other stated year (e.g. "1957 steel cent") is an
+      impossible combination — the user likely misspoke — so composition stays
+      null and is listed unresolved. (1944 steel-planchet errors are collector
+      exotica and deliberately NOT encoded.)
     - Morgan dollar 1878-1921 -> 90% silver dollar (.900 fine for the whole
       classic run). Peace dollar 1921-1935 likewise. Modern (2021+) Morgan/Peace
       commemoratives are .999 fine, so the year gate is REQUIRED for certainty.
     """
     if has_steel_kw:
-        return "Steel cent", False
+        if year is None or year == 1943:
+            return "Steel cent", False
+        return None, True
     if series == "Morgan Dollar":
         if year is not None and 1878 <= year <= 1921:
             return "90% silver dollar", False
@@ -209,11 +242,11 @@ def _certain_composition(
     return None, False
 
 
-def _parse_location_pairs(lowered: str) -> list[tuple[str, str]]:
-    pairs: list[tuple[str, str]] = []
+def _parse_location_pairs(lowered: str) -> list[tuple[str, str, Span]]:
+    pairs: list[tuple[str, str, Span]] = []
     for m in re.finditer(r"\b([a-z]+)\s+([a-z0-9][a-z0-9-]*)\b", lowered):
         if m.group(1) in _LOCATION_KINDS:
-            pairs.append((m.group(1), m.group(2)))
+            pairs.append((m.group(1), m.group(2), m.span()))
     return pairs
 
 
@@ -266,6 +299,49 @@ def _resolve_location(
     return None, phrase
 
 
+_MASK_CHAR = "\x00"
+_PUNCTUATION = set(",.;:!?()[]{}'\"-")
+
+
+def _residual_unrecognized(lowered: str, spans: list[Span]) -> list[str]:
+    """Report input text no extractor consumed, as ``unrecognized: "..."``.
+
+    Consumed spans are masked out; punctuation becomes whitespace; what remains
+    is grouped into contiguous segments (a masked region splits segments so
+    unrelated leftovers are reported separately). Filler words are stripped and
+    a segment that was pure filler is dropped. This enforces the tell-the-user
+    contract: nothing typed is ever silently ignored.
+    """
+    chars = list(lowered)
+    for start, end in spans:
+        for i in range(start, min(end, len(chars))):
+            chars[i] = _MASK_CHAR
+    for i, ch in enumerate(chars):
+        if ch in _PUNCTUATION:
+            chars[i] = " "
+    masked = "".join(chars)
+
+    segments: list[list[str]] = []
+    current: list[str] = []
+    prev_end: int | None = None
+    for m in re.finditer(rf"[^\s{_MASK_CHAR}]+", masked):
+        if prev_end is not None and _MASK_CHAR in masked[prev_end : m.start()]:
+            if current:
+                segments.append(current)
+            current = []
+        current.append(m.group(0))
+        prev_end = m.end()
+    if current:
+        segments.append(current)
+
+    out: list[str] = []
+    for segment in segments:
+        kept = [tok for tok in segment if tok not in _FILLER_WORDS]
+        if kept:
+            out.append('unrecognized: "%s"' % " ".join(kept))
+    return out
+
+
 def parse_quick_add(
     text: str,
     *,
@@ -277,8 +353,10 @@ def parse_quick_add(
 
     Pure function (no DB/network). ``parsed`` holds only fields that resolved
     cleanly; ``unresolved`` lists phrases/tokens that were recognized as
-    meaningful but could not be mapped without guessing. The caller decides
-    whether to create a coin (needs at least a series or a year).
+    meaningful but could not be mapped without guessing, PLUS an
+    ``unrecognized: "..."`` entry for any leftover text no extractor consumed.
+    The caller decides whether to create a coin (needs at least a series or a
+    year).
     """
     if not isinstance(text, str) or not text.strip():
         return {"parsed": {}, "unresolved": ["empty input"]}
@@ -286,37 +364,46 @@ def parse_quick_add(
     lowered = text.lower()
     parsed: dict[str, Any] = {}
     unresolved: list[str] = []
+    consumed: list[Span] = []
 
-    # Money first, then blank its span so a "$1943" is not read as a year.
-    cents, money_unresolved, money_span = _extract_money(text)
+    # Money first, then mask its span so a "$1943" is not read as a year.
+    cents, money_unresolved, money_span = _extract_money(lowered)
     if cents is not None:
         parsed["cost_basis_cents"] = cents
     if money_unresolved is not None:
         unresolved.append(money_unresolved)
     year_source = lowered
     if money_span is not None:
+        consumed.append(money_span)
         start, end = money_span
         year_source = lowered[:start] + " " * (end - start) + lowered[end:]
 
     # Series (also merges distinct manifest series names).
-    series, series_phrase = _match_series(lowered, series_names)
+    series, series_phrase, series_span = _match_series(lowered, series_names)
     if series is not None:
         parsed["series"] = series
+    if series_span is not None:
+        consumed.append(series_span)
 
-    # Year + mintmark (adjacency-gated).
-    year, mintmark = _extract_year_and_mint(year_source, series_phrase)
+    # Year + mintmark (adjacency-gated). Only the FIRST year candidate is used;
+    # later year tokens fall through to the residual pass as unrecognized.
+    year, mintmark, ym_spans = _extract_year_and_mint(year_source, series_phrase)
     if year is not None:
         parsed["year"] = year
     if mintmark is not None:
         parsed["mintmark"] = mintmark
+    consumed.extend(ym_spans)
 
     # Denomination: series wins; else a bare denomination word (stated fact).
+    # The word's span is consumed either way so a denomination word inside or
+    # alongside a series phrase is not re-reported as unrecognized.
+    denom, denom_span = _match_denomination(lowered)
     if series is not None and series in _SERIES_DENOMINATION:
         parsed["denomination"] = _SERIES_DENOMINATION[series]
-    else:
-        denom = _match_denomination(lowered)
-        if denom is not None:
-            parsed["denomination"] = denom
+    elif denom is not None:
+        parsed["denomination"] = denom
+    if denom_span is not None:
+        consumed.append(denom_span)
 
     # Certain composition only.
     has_steel_kw = bool(re.search(r"\bsteel\s+(?:cent|penny)\b", lowered))
@@ -342,12 +429,20 @@ def parse_quick_add(
     elif comp_uncertain:
         unresolved.append("composition")
 
-    # Location: resolve against existing labels only.
-    pairs = _parse_location_pairs(lowered)
-    loc_id, loc_unresolved = _resolve_location(pairs, locations)
+    # Location: resolve against existing labels only. The phrase's span is
+    # consumed whether or not it resolves (an unresolved phrase is already
+    # reported verbatim; do not double-report it as unrecognized).
+    triples = _parse_location_pairs(lowered)
+    consumed.extend(sp for _, _, sp in triples)
+    loc_id, loc_unresolved = _resolve_location(
+        [(k, v) for k, v, _ in triples], locations
+    )
     if loc_id is not None:
         parsed["location_id"] = loc_id
     if loc_unresolved is not None:
         unresolved.append(loc_unresolved)
+
+    # Tell-the-user contract: whatever no extractor consumed is echoed back.
+    unresolved.extend(_residual_unrecognized(lowered, consumed))
 
     return {"parsed": parsed, "unresolved": unresolved}
