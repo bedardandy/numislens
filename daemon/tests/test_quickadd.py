@@ -49,9 +49,9 @@ def test_morgan_dollar_with_mint_and_tray(client, auth_headers):
     assert p["series"] == "Morgan Dollar"
     assert p["mintmark"] == "CC"
     assert p["denomination"] == "dollar"
-    # 1885 Morgan is a certain 90% silver dollar -> hybrid melt-floor basis
+    # 1885 Morgan is a certain 90% silver dollar -> melt basis (auto-valued daily)
     assert "composition_id" in p
-    assert p["value_basis"] == "hybrid"
+    assert p["value_basis"] == "melt"
     assert p["location_id"] is not None
     assert resp.json()["unresolved"] == []
 
@@ -137,7 +137,7 @@ def test_cents_exactness_decimal_and_commas(client, auth_headers):
     p = resp.json()["parsed"]
     assert p["cost_basis_cents"] == 123456
     # 1921 Peace is in the certain 90% silver range.
-    assert p["value_basis"] == "hybrid"
+    assert p["value_basis"] == "melt"
 
 
 def test_year_only_creates_minimal_coin(client, auth_headers):

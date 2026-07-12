@@ -419,11 +419,14 @@ def parse_quick_add(
         )
         if comp is not None:
             parsed["composition_id"] = comp["id"]
-            # value_basis default per composition: a precious-metal composition
-            # gets a melt FLOOR (hybrid) — never a fabricated numismatic value.
+            # value_basis default per composition: a certain precious-metal
+            # composition defaults to 'melt' — value_est auto-fills from spot
+            # daily, clearly labeled by basis; a later human/cloud appraisal
+            # moves the coin off melt basis. Undervaluing a better-date coin
+            # until appraised is the safe error direction; overstating never is.
             # Base metal (steel cent) leaves value_basis null.
             if comp.get("metal") is not None and comp.get("precious_weight_ozt") is not None:
-                parsed["value_basis"] = "hybrid"
+                parsed["value_basis"] = "melt"
         else:
             unresolved.append("composition")
     elif comp_uncertain:
