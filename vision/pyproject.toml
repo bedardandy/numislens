@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "numislens-vision"
+version = "0.1.0"
+description = "NumisLens tiered photo identification/grading pipeline (pure REST client)"
+requires-python = ">=3.10"
+# httpx: talks to the daemon (fetch coin + images, writeback) and to the
+# OpenAI-compatible OCR/VLM endpoints. pillow: downscale phone photos before
+# base64 so calls stay small. NO numislens_core import, NO direct DB access —
+# this package is a REST client of the daemon, exactly like surfaces/mcp.
+dependencies = [
+    "httpx",
+    "pillow",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+numislens-vision = "numislens_vision.__main__:main"
+
+[tool.setuptools]
+packages = ["numislens_vision"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
