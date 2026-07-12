@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from numislens_core import Ledger
 
 from ..deps import get_ledger
@@ -17,6 +19,7 @@ LedgerDep = Annotated[Ledger, Depends(get_ledger)]
 
 @router.get("/labels.pdf", tags=["labels"])
 def labels_pdf(
+    request: Request,
     ldb: LedgerDep,
     location_id: Optional[int] = None,
     accessions: Optional[str] = None,
@@ -39,8 +42,10 @@ def labels_pdf(
                 raise HTTPException(404, f"coin not found: {a}")
             coins.append(coin)
 
-    # QR encodes numislens://c/<accession>; the PWA route /c/<accession> is delivered in Phase 3.
-    pdf_bytes = render_labels(coins)
+    # QR deep links resolve via the PWA /c/<accession> route. Prefer a stable
+    # public base (Tailscale name) over whatever host this request came in on.
+    base_url = os.environ.get("NUMISLENS_PUBLIC_URL") or str(request.base_url)
+    pdf_bytes = render_labels(coins, base_url=base_url)
     return Response(
         content=bytes(pdf_bytes),
         media_type="application/pdf",

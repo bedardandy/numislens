@@ -75,3 +75,18 @@ def test_labels_unknown_accession_404(
         headers=auth_headers,
     )
     assert response.status_code == 404
+
+
+def test_labels_qr_uses_public_url_env(client, auth_headers, make_coin, monkeypatch):
+    """QR must encode an https deep link (scannable), not the custom scheme, when a base is known."""
+    from numislens_daemon import labels as labels_mod
+    captured = []
+    real = labels_mod._qr_png_bytes
+    monkeypatch.setattr(labels_mod, "_qr_png_bytes", lambda data: captured.append(data) or real(data))
+    acc = make_coin()
+    monkeypatch.setenv("NUMISLENS_PUBLIC_URL", "https://numislens.tailnet.example")
+    resp = client.get(
+        "/api/v1/labels.pdf", params={"accessions": acc}, headers=auth_headers
+    )
+    assert resp.status_code == 200
+    assert captured and captured[0] == f"https://numislens.tailnet.example/c/{acc}"

@@ -7,7 +7,8 @@ import io
 import segno
 from fpdf import FPDF
 
-QR_SCHEME = "numislens://c/"
+# Fallback only; callers should pass an https base URL so phone cameras can open the QR.
+QR_FALLBACK_BASE = "numislens://"
 
 PAGE_W = 8.5
 PAGE_H = 11.0
@@ -49,7 +50,8 @@ def page_count(n_coins: int) -> int:
     return max(1, (n_coins + 29) // 30)
 
 
-def render_labels(coins: list[dict]) -> bytes:
+def render_labels(coins: list[dict], base_url: str | None = None) -> bytes:
+    qr_base = (base_url.rstrip("/") if base_url else QR_FALLBACK_BASE.rstrip("/")) + "/c/"
     pdf = FPDF(orientation="P", unit="in", format="Letter")
     pdf.set_auto_page_break(False)
     pdf.set_margins(0, 0, 0)
@@ -68,7 +70,7 @@ def render_labels(coins: list[dict]) -> bytes:
         x = MARGIN_LEFT + col * COL_PITCH
         y = MARGIN_TOP + row * ROW_PITCH
 
-        png = _qr_png_bytes(QR_SCHEME + coin["accession_no"])
+        png = _qr_png_bytes(qr_base + coin["accession_no"])
         qr_size = 0.85
         pdf.image(png, x=x + 0.08, y=y + 0.075, w=qr_size, h=qr_size)
 
