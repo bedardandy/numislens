@@ -54,6 +54,14 @@ numislens/
 │   ├── chatgpt/                   # Custom GPT Action: README + instructions.md
 │   ├── gemini/                    # Gemini Gem: README + instructions.md
 │   └── siri/                      # Apple Shortcuts recipes: README.md
+├── vision/                        # Phase-4 tiered photo ID/grade pipeline
+│   ├── numislens_vision/          # own package + venv; pure REST client
+│   │   ├── config, endpoints, canon, tiers, gate, pipeline
+│   │   ├── writeback.py           # fail-safe fill-null writeback + escalation stale
+│   │   ├── worker.py, __main__.py # `numislens-vision` identify/process/status
+│   │   └── ...                    # NO core import, NO direct DB
+│   ├── bench/                     # ground-truth benchmark harness + protocol
+│   └── tests/                     # pytest: canon, gate, endpoints, pipeline, writeback, worker
 ├── public/                        # the PWA — vanilla ES modules, no build step
 │   ├── index.html, manifest.json, sw.js
 │   └── js/ (api, app, router, store, offline, photo, money, tree, views/*)
@@ -105,17 +113,24 @@ numislens/
 10. **Security posture.** Bearer token + bind to localhost/Tailscale only; never
     port-forward the daemon raw. The DB never lives on someone else's cloud.
     Every `/api/v1/*` path requires the bearer token.
-11. **No vision/LLM code here (yet).** The tiered ID/grade pipeline is a later
-    phase. Deterministic tiers (melt, quick-add parsing) contain no model calls.
+11. **No vision/LLM code in core/ or daemon/.** The tiered ID/grade pipeline
+    lives ONLY in `vision/` — a separate package/venv that is a pure REST client
+    of the daemon + LAN GPU endpoints (no `numislens_core` import, no direct DB).
+    `core/` and `daemon/` stay LLM-free: the daemon's `PATCH
+    /api/v1/coins/{accession}` writeback is deterministic (fill-NULL only, never
+    overwrites), and grade set there is legitimate per invariant 2 (a photo
+    pipeline is an allowed grade source, tagged via `grade_source`). The gate in
+    `vision/gate.py` NEVER emits a guessed value — disagreements escalate.
 
 ## Test suites (keep green)
 
 Run all three before committing anything that touches their area:
 
 ```bash
-cd core            && python3 -m pytest -q     # 88 tests
-cd daemon          && python3 -m pytest -q     # 76 tests
-cd surfaces/mcp    && python3 -m pytest -q     # 23 tests (needs its own venv)
+cd core            && python3 -m pytest -q     # 96 tests
+cd daemon          && python3 -m pytest -q     # 81 tests
+cd surfaces/mcp    && python3 -m pytest -q     # 25 tests (needs its own venv + `pip install -e vision`)
+cd vision          && python3 -m pytest -q     # 53 tests (own venv; no live network)
 node --test tests/js/                           # PWA money helper
 python3 scripts/e2e_smoke.py                    # scratch daemon + temp DB, boots nothing external
 python3 scripts/check_sw_files.py               # sw.js precache list vs files on disk

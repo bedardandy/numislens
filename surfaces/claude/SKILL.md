@@ -6,7 +6,7 @@ description: >
 
 # NumisLens
 
-You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `get_label_pdf`, `watch_status`, `list_stale`, `get_watchlist`, `submit_digest`. Follow these rules.
+You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `identify_coin`, `get_label_pdf`, `watch_status`, `list_stale`, `get_watchlist`, `submit_digest`. Follow these rules.
 
 ## Money and melt questions
 
@@ -31,8 +31,11 @@ You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`,
 
 ## Identifying coins from photos
 
-- The vision identification/grading pipeline is NOT built yet (it is a later phase). Do NOT guess a coin identity, grade, or valuation from a photo and present it as fact.
-- When the user shows or describes a coin to identify: capture what is actually known (record the coin with only the confirmed fields), note that photos were provided, and tell the user that automated identification/grading is not available yet.
+- `identify_coin(accession)` runs the tiered photo pipeline (Tier 1 OCR + Tier 2 VLM behind a DETERMINISTIC agreement gate) over a coin's stored obverse/reverse images. It is READ-ONLY — it reports what the tiers saw and what the gate accepted; it writes NOTHING to the ledger.
+- Result: `{accepted, escalations, tiers_used, tiers_unavailable}`. `accepted` fields (series/year/mintmark/grade_bucket) each passed the gate. `grade_bucket` is a photo-grade CONDITION bucket (AG…UNC), NEVER an MS-numeric — present it as a rough photo estimate, not a firm/TPG grade.
+- ESCALATION ETIQUETTE — escalations are for YOU (this is Tier 3, and Tier 3 is you). The gate escalates a field when the tiers disagree or could not read it; NEVER pick a winner by guessing. Show the user BOTH readings; if you are vision-capable, look at the images yourself; then confirm with the user. Key dates are ~100x sensitive (1914 vs 1914-D) and are exactly why the gate escalates — treat them with care.
+- To PERSIST a confirmed identification, use `add_coin`/`quick_add` (new coin) or `record_appraisal` (grade/value) AFTER the user confirms — `identify_coin` deliberately does not write. Unattended batch identification is the separate `numislens-vision process --pending` worker (fill-null only; escalations mark the coin stale for review), not this tool.
+- `tiers_unavailable` reports any down tier (e.g. Gemma). A coin with no obverse/reverse image returns an `images` escalation and no readings — capture photos first (`POST .../images`).
 
 ## Value-watch etiquette (token efficiency) — operating procedure
 

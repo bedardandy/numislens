@@ -242,3 +242,73 @@ def test_move_without_expected_from_200(
     )
     assert move.status_code == 200
     assert move.json()["location_id"] == location_b
+
+
+# --- Phase 4: PATCH /coins/{accession} vision writeback --------------------
+
+
+def test_patch_fills_null_and_reports_skips(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    created = client.post(
+        "/api/v1/coins", json={"year": 1943}, headers=auth_headers
+    )
+    acc = created.json()["accession_no"]
+    resp = client.patch(
+        f"/api/v1/coins/{acc}",
+        json={"series": "Lincoln Wheat Cent", "year": 1949, "mintmark": "D"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["written"] == {"series": "Lincoln Wheat Cent", "mintmark": "D"}
+    assert body["skipped"] == {"year": 1943}
+    assert body["coin"]["series"] == "Lincoln Wheat Cent"
+    assert body["coin"]["year"] == 1943
+
+
+def test_patch_unknown_coin_404(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    resp = client.patch(
+        "/api/v1/coins/NL-999999", json={"series": "x"}, headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+def test_patch_invalid_grade_source_422(
+    client: TestClient, auth_headers: dict[str, str], make_coin
+) -> None:
+    acc = make_coin({"grade_bucket": None})
+    resp = client.patch(
+        f"/api/v1/coins/{acc}",
+        json={"grade_bucket": "XF", "grade_source": "bogus"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_patch_unknown_field_422(
+    client: TestClient, auth_headers: dict[str, str], make_coin
+) -> None:
+    acc = make_coin()
+    resp = client.patch(
+        f"/api/v1/coins/{acc}",
+        json={"value_est_cents": 100},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_get_coin_includes_appraisals(
+    client: TestClient, auth_headers: dict[str, str], make_coin
+) -> None:
+    acc = make_coin()
+    client.post(
+        f"/api/v1/coins/{acc}/appraise",
+        json={"appraised_by": "vision:cross-vote", "grade_bucket": "XF"},
+        headers=auth_headers,
+    )
+    body = client.get(f"/api/v1/coins/{acc}", headers=auth_headers).json()
+    assert "appraisals" in body
+    assert body["appraisals"][0]["appraised_by"] == "vision:cross-vote"

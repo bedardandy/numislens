@@ -385,6 +385,64 @@
             "bearerAuth": []
           }
         ]
+      },
+      "patch": {
+        "tags": [
+          "coins"
+        ],
+        "summary": "Identify Coin",
+        "description": "Fill NULL identification fields on an existing coin (Phase-4 writeback).\n\nFill-NULL-ONLY: any field the coin already has is left untouched and\nreported in ``skipped`` — a vision pass never overwrites a user/human\nidentity or grade. This is the sole endpoint that sets ``grade_bucket``\noutside coin creation, and only with a ``grade_source`` recording that a\nphoto pipeline produced it. Returns ``{written, skipped, coin}``.",
+        "operationId": "identify_coin_api_v1_coins__accession__patch",
+        "parameters": [
+          {
+            "name": "accession",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Accession"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoinIdentify"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Identify Coin Api V1 Coins  Accession  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/coins/{accession}/images/{content_hash}": {
@@ -1670,6 +1728,101 @@
         "additionalProperties": false,
         "type": "object",
         "title": "CoinCreate"
+      },
+      "CoinIdentify": {
+        "properties": {
+          "series": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "mintmark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mintmark"
+          },
+          "denomination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denomination"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "composition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composition Id"
+          },
+          "grade_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade Bucket"
+          },
+          "grade_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CoinIdentify"
       },
       "DigestBody": {
         "properties": {

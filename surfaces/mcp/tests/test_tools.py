@@ -334,3 +334,38 @@ async def test_submit_digest_unknown_series_relays_422() -> None:
         )
         result = await submit_digest([{"series": "X", "reason": "y"}])
     assert result.startswith("Error: API error 422:")
+
+
+async def test_identify_coin_returns_result_verbatim(monkeypatch) -> None:
+    from numislens_vision import pipeline
+
+    from numislens_mcp.server import identify_coin
+
+    canned = {
+        "accession": "NL-000001",
+        "accepted": {"series": "Peace Dollar", "year": 1921, "mintmark": None,
+                     "grade_bucket": "XF", "grade_confidence": "photo-grade"},
+        "escalations": [{"field": "mintmark",
+                         "readings": {"ocr": "D", "vlm": "NONE"}, "note": "disagree"}],
+        "tiers_used": ["ocr:x", "vlm:y"],
+        "tiers_unavailable": ["gemma: not configured"],
+    }
+    monkeypatch.setattr(pipeline, "identify", lambda cfg, acc: canned)
+    out = identify_coin("NL-000001")
+    parsed = json.loads(out)
+    assert parsed == canned
+    # Escalations survive verbatim for the assistant to adjudicate.
+    assert parsed["escalations"][0]["field"] == "mintmark"
+
+
+async def test_identify_coin_reports_error(monkeypatch) -> None:
+    from numislens_vision import pipeline
+
+    from numislens_mcp.server import identify_coin
+
+    def boom(cfg, acc):
+        raise RuntimeError("cannot reach the NumisLens daemon")
+
+    monkeypatch.setattr(pipeline, "identify", boom)
+    out = identify_coin("NL-000001")
+    assert out.startswith("Error: cannot reach the NumisLens daemon")

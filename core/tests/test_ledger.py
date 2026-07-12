@@ -371,3 +371,84 @@ def test_move_coin_without_expected_from_unchanged(ledger):
     accession = ledger.add_coin(location_id=loc_a)
     ledger.move_coin(accession, loc_b)
     assert ledger.get_coin(accession)["location_id"] == loc_b
+
+
+# --- Phase 4: vision writeback (fill-null identification) -------------------
+
+
+def test_update_identification_fills_null_only(ledger):
+    acc = ledger.add_coin(year=1943)  # series null, mintmark null
+    result = ledger.update_identification(
+        acc, series="Lincoln Wheat Cent", year=1949, mintmark="D"
+    )
+    # series+mintmark were null -> written; year already set -> skipped (never
+    # overwrite a value the coin already had).
+    assert result["written"] == {"series": "Lincoln Wheat Cent", "mintmark": "D"}
+    assert result["skipped"] == {"year": 1943}
+    coin = ledger.get_coin(acc)
+    assert coin["series"] == "Lincoln Wheat Cent"
+    assert coin["mintmark"] == "D"
+    assert coin["year"] == 1943  # unchanged
+
+
+def test_update_identification_sets_grade_with_source(ledger):
+    acc = ledger.add_coin(series="Peace Dollar", year=1921)
+    result = ledger.update_identification(
+        acc, grade_bucket="XF", grade_source="local-vlm"
+    )
+    assert result["written"] == {"grade_bucket": "XF", "grade_source": "local-vlm"}
+    coin = ledger.get_coin(acc)
+    assert coin["grade_bucket"] == "XF"
+    assert coin["grade_source"] == "local-vlm"
+
+
+def test_update_identification_appends_identified_event(ledger):
+    acc = ledger.add_coin(year=1943)
+    ledger.update_identification(acc, series="Lincoln Wheat Cent")
+    coin_id = ledger._coin_id(acc)
+    rows = ledger.conn.execute(
+        "SELECT event_type, detail FROM events WHERE coin_id = ? AND event_type = 'identified'",
+        (coin_id,),
+    ).fetchall()
+    assert len(rows) == 1
+    assert "Lincoln Wheat Cent" in rows[0]["detail"]
+
+
+def test_update_identification_no_writes_appends_no_event(ledger):
+    acc = ledger.add_coin(series="Peace Dollar", year=1921, mintmark="P")
+    result = ledger.update_identification(acc, series="Morgan Dollar")
+    assert result["written"] == {}
+    assert result["skipped"] == {"series": "Peace Dollar"}
+    coin_id = ledger._coin_id(acc)
+    n = ledger.conn.execute(
+        "SELECT COUNT(*) FROM events WHERE coin_id = ? AND event_type = 'identified'",
+        (coin_id,),
+    ).fetchone()[0]
+    assert n == 0
+
+
+def test_update_identification_invalid_grade_source_raises(ledger):
+    acc = ledger.add_coin(year=1943)
+    with pytest.raises(ValueError, match="grade_source"):
+        ledger.update_identification(acc, grade_bucket="XF", grade_source="bogus")
+
+
+def test_update_identification_unknown_field_raises(ledger):
+    acc = ledger.add_coin(year=1943)
+    with pytest.raises(ValueError, match="identification fields"):
+        ledger.update_identification(acc, value_est_cents=100)
+
+
+def test_update_identification_unknown_coin_raises(ledger):
+    with pytest.raises(CoinNotFound):
+        ledger.update_identification("NL-999999", series="x")
+
+
+def test_list_appraisals_newest_first(ledger):
+    acc = ledger.add_coin(year=1943)
+    ledger.record_appraisal(acc, "human", grade_bucket="VF", appraised_at="2026-01-01T00:00:00+00:00")
+    ledger.record_appraisal(acc, "vision:cross-vote", grade_bucket="XF", appraised_at="2026-02-01T00:00:00+00:00")
+    rows = ledger.list_appraisals(acc)
+    assert len(rows) == 2
+    assert rows[0]["appraised_by"] == "vision:cross-vote"  # newest first
+    assert rows[1]["appraised_by"] == "human"

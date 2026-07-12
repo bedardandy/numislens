@@ -39,6 +39,22 @@ class CoinCreate(StrictModel):
     notes: Optional[str] = None
 
 
+class CoinIdentify(StrictModel):
+    # Phase-4 vision writeback: fill NULL identification fields on an existing
+    # coin. The daemon/core fill NULL-only and never overwrite (see
+    # Ledger.update_identification); non-null fields are reported skipped. This
+    # is the one endpoint that legitimately sets grade_bucket outside coin
+    # creation — grade_source records that a photo pipeline produced it.
+    series: Optional[str] = None
+    year: Optional[int] = None
+    mintmark: Optional[str] = None
+    denomination: Optional[str] = None
+    country: Optional[str] = None
+    composition_id: Optional[int] = None
+    grade_bucket: Optional[str] = None
+    grade_source: Optional[str] = None
+
+
 class QuickAddBody(StrictModel):
     text: str = Field(
         description="Free-text coin capture, e.g. '1943 steel cent, box 3 slot 12, paid $4'."

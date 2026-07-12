@@ -658,5 +658,57 @@ async def get_label_pdf(
         return f"Error: {exc}"
 
 
+@mcp.tool(
+    name="identify_coin",
+    annotations={
+        "title": "Identify Coin from Photos (vision)",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+)
+def identify_coin(accession: str) -> str:
+    """Run the tiered PHOTO identification pipeline for one coin (Tier 1-2).
+
+    Fetches the coin's stored obverse/reverse images and cross-reads them with
+    the local OCR (PaddleOCR-VL) and VLM (Qwen) tiers behind a DETERMINISTIC
+    agreement gate. This tool is READ-ONLY: it writes nothing to the ledger, it
+    only reports what the tiers saw and what the gate accepted.
+
+    Returns the result verbatim:
+    ``{accession, accepted:{series,year,mintmark,grade_bucket,grade_confidence},
+       escalations:[{field, readings:{ocr,vlm,gemma}, note}],
+       tiers_used, tiers_unavailable}``.
+
+    HOW TO USE THE RESULT — this is Tier 3, and Tier 3 is YOU:
+    * ``accepted`` fields passed the gate (tiers agreed). ``grade_bucket`` is a
+      photo-grade condition bucket, NEVER an MS-numeric — present it as such.
+    * ``escalations`` are DISAGREEMENTS the gate refused to resolve. NEVER pick a
+      winner by guessing. Show the user BOTH readings, or look at the images
+      yourself if you are vision-capable, then confirm. Key dates (a 1914 vs
+      1914-D cent is ~100x) are exactly why the gate escalates — treat them with
+      care.
+    * To persist a confirmed identification/grade, use ``add_coin`` (new coin) or
+      ``record_appraisal`` (grade/value) after the human confirms — this tool
+      deliberately does not write. The unattended batch writer is the separate
+      ``numislens-vision process --pending`` worker, not this tool.
+    """
+    try:
+        from numislens_vision import pipeline
+        from numislens_vision.config import load_config as load_vision_config
+
+        cfg = load_vision_config()
+        result = pipeline.identify(cfg, accession)
+        return _dumps(result)
+    except ImportError:
+        return (
+            "Error: the numislens-vision package is not installed in this MCP "
+            "environment. Install it: pip install -e vision (in the MCP venv)."
+        )
+    except Exception as exc:  # DaemonError, endpoint errors, etc. — fail loud.
+        return f"Error: {exc}"
+
+
 if __name__ == "__main__":
     mcp.run()

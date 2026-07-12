@@ -12,7 +12,7 @@ from numislens_core import Ledger
 
 from ..deps import get_ledger
 from ..quickadd import parse_quick_add
-from ..schemas import AppraiseBody, CoinCreate, MoveBody, QuickAddBody
+from ..schemas import AppraiseBody, CoinCreate, CoinIdentify, MoveBody, QuickAddBody
 from ..serializers import serialize_coin
 
 router = APIRouter()
@@ -136,6 +136,27 @@ def get_coin(accession: str, ldb: LedgerDep) -> dict | None:
         {"kind": img["kind"], "content_hash": img["content_hash"]}
         for img in ldb.list_images(accession)
     ]
+    # Append-only appraisal trail (newest first). Lets the vision worker detect
+    # a prior vision:* appraisal and skip re-processing under --pending, and
+    # surfaces the provenance to any surface that wants it.
+    result["appraisals"] = ldb.list_appraisals(accession)
+    return result
+
+
+@router.patch("/coins/{accession}", tags=["coins"])
+def identify_coin(accession: str, body: CoinIdentify, ldb: LedgerDep) -> dict:
+    """Fill NULL identification fields on an existing coin (Phase-4 writeback).
+
+    Fill-NULL-ONLY: any field the coin already has is left untouched and
+    reported in ``skipped`` — a vision pass never overwrites a user/human
+    identity or grade. This is the sole endpoint that sets ``grade_bucket``
+    outside coin creation, and only with a ``grade_source`` recording that a
+    photo pipeline produced it. Returns ``{written, skipped, coin}``.
+    """
+    result = ldb.update_identification(
+        accession, **body.model_dump(exclude_unset=True)
+    )
+    result["coin"] = serialize_coin(ldb.get_coin(accession))
     return result
 
 

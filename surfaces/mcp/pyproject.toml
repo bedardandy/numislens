@@ -10,6 +10,9 @@ requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]",
     "httpx",
+    # identify_coin runs the Phase-4 pipeline in-process. Install the local
+    # package into this venv: pip install -e vision (see ops/README.md).
+    "numislens-vision",
 ]
 
 [project.optional-dependencies]

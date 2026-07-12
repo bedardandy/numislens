@@ -34,9 +34,12 @@ OUTPUT = REPO_ROOT / "surfaces" / "openapi.json"
 # Tailscale Funnel with the bearer token (see surfaces/README.md).
 SERVER_URL = "https://numislens.YOUR-TAILNET-NAME.ts.net"
 
-# The daemon exposed 22 unique path templates after Phase 5; Phase 6 adds
-# GET /api/v1/watch/status and POST /api/v1/watch/digest for 24. Assert the real
-# number so an accidental route drop/add is caught at export time.
+# The daemon exposed 22 unique path templates after Phase 5; Phase 6 added
+# GET /api/v1/watch/status and POST /api/v1/watch/digest (24); Phase 4 adds the
+# vision writeback PATCH /api/v1/coins/{accession} (same template as GET, so it
+# is not a new path) — the new path count comes from... nothing: PATCH reuses
+# the existing /api/v1/coins/{accession} template. Count stays 24. Assert the
+# real number so an accidental route drop/add is caught at export time.
 EXPECTED_PATH_COUNT = 24
 
 

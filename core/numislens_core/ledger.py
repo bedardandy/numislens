@@ -553,6 +553,96 @@ class Ledger:
             )
         return appraisal_id
 
+    # Identification fields the vision writeback may fill. country carries a
+    # DEFAULT 'US', so it is effectively never null and will always be reported
+    # skipped — that is fine, it is included for completeness.
+    IDENTIFICATION_FIELDS = (
+        "series",
+        "year",
+        "mintmark",
+        "denomination",
+        "country",
+        "composition_id",
+        "grade_bucket",
+        "grade_source",
+    )
+
+    def update_identification(self, accession: str, **fields) -> dict:
+        """Fill NULL identification fields only; never overwrite existing data.
+
+        The single append-write path the Phase-4 vision writeback uses to record
+        a gated identification onto an existing coin. Each provided, non-None
+        field is written ONLY if the coin's current value is NULL; a field that
+        already has a value is left untouched and reported in ``skipped`` (never
+        overwrite a user/human-entered identity or grade). ``grade_bucket`` here
+        is legitimate per the "grade only from a photo pipeline or human/TPG"
+        rule — the pipeline IS that source, tagged via ``grade_source``.
+
+        Returns ``{"written": {...}, "skipped": {...current values...}}`` and
+        appends an ``identified`` event listing what was written.
+        """
+        coin_id = self._coin_id(accession)
+        unknown = set(fields) - set(self.IDENTIFICATION_FIELDS)
+        if unknown:
+            raise ValueError(f"not identification fields: {sorted(unknown)}")
+        provided = {k: v for k, v in fields.items() if v is not None}
+        if "grade_bucket" in provided and provided["grade_bucket"] not in GRADE_BUCKETS:
+            raise ValueError(f"invalid grade_bucket: {provided['grade_bucket']!r}")
+        if "grade_source" in provided and provided["grade_source"] not in GRADE_SOURCES:
+            raise ValueError(f"invalid grade_source: {provided['grade_source']!r}")
+        if "composition_id" in provided:
+            row = self.conn.execute(
+                "SELECT id FROM compositions WHERE id = ?", (provided["composition_id"],)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"unknown composition_id: {provided['composition_id']}")
+
+        current = self.conn.execute(
+            "SELECT * FROM coins WHERE id = ?", (coin_id,)
+        ).fetchone()
+        written: dict = {}
+        skipped: dict = {}
+        for key, value in provided.items():
+            if current[key] is None:
+                written[key] = value
+            else:
+                skipped[key] = current[key]
+
+        if written:
+            now = _utcnow()
+            set_clause = ", ".join(f"{k} = ?" for k in written)
+            params = [*written.values(), coin_id]
+            with self.conn:
+                self.conn.execute("PRAGMA foreign_keys = ON")
+                self.conn.execute(
+                    f"UPDATE coins SET {set_clause} WHERE id = ?", params
+                )
+                self.conn.execute(
+                    """
+                    INSERT INTO events (coin_id, event_type, at, detail)
+                    VALUES (?, 'identified', ?, ?)
+                    """,
+                    (coin_id, now, json.dumps(written)),
+                )
+        return {"written": written, "skipped": skipped}
+
+    def list_appraisals(self, accession: str) -> list[dict]:
+        """All appraisal rows for a coin, newest first (append-only read).
+
+        Exposed so the vision worker can tell whether a coin already has a
+        ``vision:*`` appraisal and skip re-processing it under ``--pending``.
+        """
+        coin_id = self._coin_id(accession)
+        rows = self.conn.execute(
+            """
+            SELECT * FROM appraisals
+            WHERE coin_id = ?
+            ORDER BY appraised_at DESC, id DESC
+            """,
+            (coin_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def latest_appraisal(self, accession: str) -> dict | None:
         coin_id = self._coin_id(accession)
         row = self.conn.execute(
