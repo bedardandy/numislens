@@ -12,6 +12,9 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest"]
 
+[project.scripts]
+numislens = "numislens_core.cli:main"
+
 [tool.setuptools]
 packages = ["numislens_core"]
 

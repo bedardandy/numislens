@@ -136,8 +136,9 @@ class Ledger:
             self._verify_location(location_id)
 
         now = _utcnow()
-        with self.conn:
-            self.conn.execute("PRAGMA foreign_keys = ON")
+        self.conn.execute("PRAGMA foreign_keys = ON")
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
             row = self.conn.execute(
                 """
                 SELECT 1 + COALESCE(MAX(CAST(substr(accession_no, 4) AS INTEGER)), 0)
@@ -190,6 +191,10 @@ class Ledger:
                 """,
                 (coin_id, now, json.dumps(location_id)),
             )
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
         return accession
 
     def get_coin(self, accession: str) -> dict | None:
