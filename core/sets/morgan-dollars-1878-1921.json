@@ -1,0 +1,395 @@
+{
+  "id": "morgan-dollars-1878-1921",
+  "name": "Morgan Dollars (1878-1921)",
+  "series": "Morgan Dollar",
+  "composition_ref": "90% silver dollar",
+  "slots": [
+    {
+      "year": 1878,
+      "mint": "P"
+    },
+    {
+      "year": 1878,
+      "mint": "CC"
+    },
+    {
+      "year": 1878,
+      "mint": "S"
+    },
+    {
+      "year": 1879,
+      "mint": "P"
+    },
+    {
+      "year": 1879,
+      "mint": "CC"
+    },
+    {
+      "year": 1879,
+      "mint": "O"
+    },
+    {
+      "year": 1879,
+      "mint": "S"
+    },
+    {
+      "year": 1880,
+      "mint": "P"
+    },
+    {
+      "year": 1880,
+      "mint": "CC"
+    },
+    {
+      "year": 1880,
+      "mint": "O"
+    },
+    {
+      "year": 1880,
+      "mint": "S"
+    },
+    {
+      "year": 1881,
+      "mint": "P"
+    },
+    {
+      "year": 1881,
+      "mint": "CC"
+    },
+    {
+      "year": 1881,
+      "mint": "O"
+    },
+    {
+      "year": 1881,
+      "mint": "S"
+    },
+    {
+      "year": 1882,
+      "mint": "P"
+    },
+    {
+      "year": 1882,
+      "mint": "CC"
+    },
+    {
+      "year": 1882,
+      "mint": "O"
+    },
+    {
+      "year": 1882,
+      "mint": "S"
+    },
+    {
+      "year": 1883,
+      "mint": "P"
+    },
+    {
+      "year": 1883,
+      "mint": "CC"
+    },
+    {
+      "year": 1883,
+      "mint": "O"
+    },
+    {
+      "year": 1883,
+      "mint": "S"
+    },
+    {
+      "year": 1884,
+      "mint": "P"
+    },
+    {
+      "year": 1884,
+      "mint": "CC"
+    },
+    {
+      "year": 1884,
+      "mint": "O"
+    },
+    {
+      "year": 1884,
+      "mint": "S"
+    },
+    {
+      "year": 1885,
+      "mint": "P"
+    },
+    {
+      "year": 1885,
+      "mint": "CC"
+    },
+    {
+      "year": 1885,
+      "mint": "O"
+    },
+    {
+      "year": 1885,
+      "mint": "S"
+    },
+    {
+      "year": 1886,
+      "mint": "P"
+    },
+    {
+      "year": 1886,
+      "mint": "O"
+    },
+    {
+      "year": 1886,
+      "mint": "S"
+    },
+    {
+      "year": 1887,
+      "mint": "P"
+    },
+    {
+      "year": 1887,
+      "mint": "O"
+    },
+    {
+      "year": 1887,
+      "mint": "S"
+    },
+    {
+      "year": 1888,
+      "mint": "P"
+    },
+    {
+      "year": 1888,
+      "mint": "O"
+    },
+    {
+      "year": 1888,
+      "mint": "S"
+    },
+    {
+      "year": 1889,
+      "mint": "P"
+    },
+    {
+      "year": 1889,
+      "mint": "CC",
+      "key_date": true
+    },
+    {
+      "year": 1889,
+      "mint": "O"
+    },
+    {
+      "year": 1889,
+      "mint": "S"
+    },
+    {
+      "year": 1890,
+      "mint": "P"
+    },
+    {
+      "year": 1890,
+      "mint": "CC"
+    },
+    {
+      "year": 1890,
+      "mint": "O"
+    },
+    {
+      "year": 1890,
+      "mint": "S"
+    },
+    {
+      "year": 1891,
+      "mint": "P"
+    },
+    {
+      "year": 1891,
+      "mint": "CC"
+    },
+    {
+      "year": 1891,
+      "mint": "O"
+    },
+    {
+      "year": 1891,
+      "mint": "S"
+    },
+    {
+      "year": 1892,
+      "mint": "P"
+    },
+    {
+      "year": 1892,
+      "mint": "CC"
+    },
+    {
+      "year": 1892,
+      "mint": "O"
+    },
+    {
+      "year": 1892,
+      "mint": "S"
+    },
+    {
+      "year": 1893,
+      "mint": "P"
+    },
+    {
+      "year": 1893,
+      "mint": "CC"
+    },
+    {
+      "year": 1893,
+      "mint": "O"
+    },
+    {
+      "year": 1893,
+      "mint": "S",
+      "key_date": true
+    },
+    {
+      "year": 1894,
+      "mint": "P"
+    },
+    {
+      "year": 1894,
+      "mint": "O"
+    },
+    {
+      "year": 1894,
+      "mint": "S"
+    },
+    {
+      "year": 1895,
+      "mint": "P",
+      "note": "proof-only issue; no business strikes confirmed"
+    },
+    {
+      "year": 1895,
+      "mint": "O"
+    },
+    {
+      "year": 1895,
+      "mint": "S"
+    },
+    {
+      "year": 1896,
+      "mint": "P"
+    },
+    {
+      "year": 1896,
+      "mint": "O"
+    },
+    {
+      "year": 1896,
+      "mint": "S"
+    },
+    {
+      "year": 1897,
+      "mint": "P"
+    },
+    {
+      "year": 1897,
+      "mint": "O"
+    },
+    {
+      "year": 1897,
+      "mint": "S"
+    },
+    {
+      "year": 1898,
+      "mint": "P"
+    },
+    {
+      "year": 1898,
+      "mint": "O"
+    },
+    {
+      "year": 1898,
+      "mint": "S"
+    },
+    {
+      "year": 1899,
+      "mint": "P"
+    },
+    {
+      "year": 1899,
+      "mint": "O"
+    },
+    {
+      "year": 1899,
+      "mint": "S"
+    },
+    {
+      "year": 1900,
+      "mint": "P"
+    },
+    {
+      "year": 1900,
+      "mint": "O"
+    },
+    {
+      "year": 1900,
+      "mint": "S"
+    },
+    {
+      "year": 1901,
+      "mint": "P"
+    },
+    {
+      "year": 1901,
+      "mint": "O"
+    },
+    {
+      "year": 1901,
+      "mint": "S"
+    },
+    {
+      "year": 1902,
+      "mint": "P"
+    },
+    {
+      "year": 1902,
+      "mint": "O"
+    },
+    {
+      "year": 1902,
+      "mint": "S"
+    },
+    {
+      "year": 1903,
+      "mint": "P"
+    },
+    {
+      "year": 1903,
+      "mint": "O"
+    },
+    {
+      "year": 1903,
+      "mint": "S"
+    },
+    {
+      "year": 1904,
+      "mint": "P"
+    },
+    {
+      "year": 1904,
+      "mint": "O"
+    },
+    {
+      "year": 1904,
+      "mint": "S"
+    },
+    {
+      "year": 1921,
+      "mint": "P"
+    },
+    {
+      "year": 1921,
+      "mint": "D"
+    },
+    {
+      "year": 1921,
+      "mint": "S"
+    }
+  ]
+}

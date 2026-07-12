@@ -1,0 +1,342 @@
+{
+  "id": "washington-quarters-1932-1964",
+  "name": "Washington Quarters (Silver, 1932-1964)",
+  "series": "Washington Quarter",
+  "composition_ref": "90% silver quarter",
+  "slots": [
+    {
+      "year": 1932,
+      "mint": "P"
+    },
+    {
+      "year": 1932,
+      "mint": "D",
+      "key_date": true
+    },
+    {
+      "year": 1932,
+      "mint": "S",
+      "key_date": true
+    },
+    {
+      "year": 1934,
+      "mint": "P"
+    },
+    {
+      "year": 1934,
+      "mint": "D"
+    },
+    {
+      "year": 1935,
+      "mint": "P"
+    },
+    {
+      "year": 1935,
+      "mint": "D"
+    },
+    {
+      "year": 1935,
+      "mint": "S"
+    },
+    {
+      "year": 1936,
+      "mint": "P"
+    },
+    {
+      "year": 1936,
+      "mint": "D"
+    },
+    {
+      "year": 1936,
+      "mint": "S"
+    },
+    {
+      "year": 1937,
+      "mint": "P"
+    },
+    {
+      "year": 1937,
+      "mint": "D"
+    },
+    {
+      "year": 1937,
+      "mint": "S"
+    },
+    {
+      "year": 1938,
+      "mint": "P"
+    },
+    {
+      "year": 1938,
+      "mint": "S"
+    },
+    {
+      "year": 1939,
+      "mint": "P"
+    },
+    {
+      "year": 1939,
+      "mint": "D"
+    },
+    {
+      "year": 1939,
+      "mint": "S"
+    },
+    {
+      "year": 1940,
+      "mint": "P"
+    },
+    {
+      "year": 1940,
+      "mint": "D"
+    },
+    {
+      "year": 1940,
+      "mint": "S"
+    },
+    {
+      "year": 1941,
+      "mint": "P"
+    },
+    {
+      "year": 1941,
+      "mint": "D"
+    },
+    {
+      "year": 1941,
+      "mint": "S"
+    },
+    {
+      "year": 1942,
+      "mint": "P"
+    },
+    {
+      "year": 1942,
+      "mint": "D"
+    },
+    {
+      "year": 1942,
+      "mint": "S"
+    },
+    {
+      "year": 1943,
+      "mint": "P"
+    },
+    {
+      "year": 1943,
+      "mint": "D"
+    },
+    {
+      "year": 1943,
+      "mint": "S"
+    },
+    {
+      "year": 1944,
+      "mint": "P"
+    },
+    {
+      "year": 1944,
+      "mint": "D"
+    },
+    {
+      "year": 1944,
+      "mint": "S"
+    },
+    {
+      "year": 1945,
+      "mint": "P"
+    },
+    {
+      "year": 1945,
+      "mint": "D"
+    },
+    {
+      "year": 1945,
+      "mint": "S"
+    },
+    {
+      "year": 1946,
+      "mint": "P"
+    },
+    {
+      "year": 1946,
+      "mint": "D"
+    },
+    {
+      "year": 1946,
+      "mint": "S"
+    },
+    {
+      "year": 1947,
+      "mint": "P"
+    },
+    {
+      "year": 1947,
+      "mint": "D"
+    },
+    {
+      "year": 1947,
+      "mint": "S"
+    },
+    {
+      "year": 1948,
+      "mint": "P"
+    },
+    {
+      "year": 1948,
+      "mint": "D"
+    },
+    {
+      "year": 1948,
+      "mint": "S"
+    },
+    {
+      "year": 1949,
+      "mint": "P"
+    },
+    {
+      "year": 1949,
+      "mint": "D"
+    },
+    {
+      "year": 1950,
+      "mint": "P"
+    },
+    {
+      "year": 1950,
+      "mint": "D"
+    },
+    {
+      "year": 1950,
+      "mint": "S"
+    },
+    {
+      "year": 1951,
+      "mint": "P"
+    },
+    {
+      "year": 1951,
+      "mint": "D"
+    },
+    {
+      "year": 1951,
+      "mint": "S"
+    },
+    {
+      "year": 1952,
+      "mint": "P"
+    },
+    {
+      "year": 1952,
+      "mint": "D"
+    },
+    {
+      "year": 1952,
+      "mint": "S"
+    },
+    {
+      "year": 1953,
+      "mint": "P"
+    },
+    {
+      "year": 1953,
+      "mint": "D"
+    },
+    {
+      "year": 1953,
+      "mint": "S"
+    },
+    {
+      "year": 1954,
+      "mint": "P"
+    },
+    {
+      "year": 1954,
+      "mint": "D"
+    },
+    {
+      "year": 1954,
+      "mint": "S"
+    },
+    {
+      "year": 1955,
+      "mint": "P"
+    },
+    {
+      "year": 1955,
+      "mint": "D"
+    },
+    {
+      "year": 1956,
+      "mint": "P"
+    },
+    {
+      "year": 1956,
+      "mint": "D"
+    },
+    {
+      "year": 1957,
+      "mint": "P"
+    },
+    {
+      "year": 1957,
+      "mint": "D"
+    },
+    {
+      "year": 1958,
+      "mint": "P"
+    },
+    {
+      "year": 1958,
+      "mint": "D"
+    },
+    {
+      "year": 1959,
+      "mint": "P"
+    },
+    {
+      "year": 1959,
+      "mint": "D"
+    },
+    {
+      "year": 1960,
+      "mint": "P"
+    },
+    {
+      "year": 1960,
+      "mint": "D"
+    },
+    {
+      "year": 1961,
+      "mint": "P"
+    },
+    {
+      "year": 1961,
+      "mint": "D"
+    },
+    {
+      "year": 1962,
+      "mint": "P"
+    },
+    {
+      "year": 1962,
+      "mint": "D"
+    },
+    {
+      "year": 1963,
+      "mint": "P"
+    },
+    {
+      "year": 1963,
+      "mint": "D"
+    },
+    {
+      "year": 1964,
+      "mint": "P"
+    },
+    {
+      "year": 1964,
+      "mint": "D"
+    }
+  ]
+}

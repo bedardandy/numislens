@@ -1,0 +1,582 @@
+{
+  "id": "lincoln-wheat-1909-1958",
+  "name": "Lincoln Wheat Cents (1909-1958)",
+  "series": "Lincoln Wheat Cent",
+  "composition_ref": "Bronze cent",
+  "slots": [
+    {
+      "year": 1909,
+      "mint": "P"
+    },
+    {
+      "year": 1909,
+      "mint": "P",
+      "note": "VDB reverse variety"
+    },
+    {
+      "year": 1909,
+      "mint": "S"
+    },
+    {
+      "year": 1909,
+      "mint": "S",
+      "key_date": true,
+      "note": "VDB reverse variety (key date)"
+    },
+    {
+      "year": 1910,
+      "mint": "P"
+    },
+    {
+      "year": 1910,
+      "mint": "S"
+    },
+    {
+      "year": 1911,
+      "mint": "D"
+    },
+    {
+      "year": 1911,
+      "mint": "P"
+    },
+    {
+      "year": 1911,
+      "mint": "S"
+    },
+    {
+      "year": 1912,
+      "mint": "D"
+    },
+    {
+      "year": 1912,
+      "mint": "P"
+    },
+    {
+      "year": 1912,
+      "mint": "S"
+    },
+    {
+      "year": 1913,
+      "mint": "D"
+    },
+    {
+      "year": 1913,
+      "mint": "P"
+    },
+    {
+      "year": 1913,
+      "mint": "S"
+    },
+    {
+      "year": 1914,
+      "mint": "D",
+      "key_date": true
+    },
+    {
+      "year": 1914,
+      "mint": "P"
+    },
+    {
+      "year": 1914,
+      "mint": "S"
+    },
+    {
+      "year": 1915,
+      "mint": "D"
+    },
+    {
+      "year": 1915,
+      "mint": "P"
+    },
+    {
+      "year": 1915,
+      "mint": "S"
+    },
+    {
+      "year": 1916,
+      "mint": "D"
+    },
+    {
+      "year": 1916,
+      "mint": "P"
+    },
+    {
+      "year": 1916,
+      "mint": "S"
+    },
+    {
+      "year": 1917,
+      "mint": "D"
+    },
+    {
+      "year": 1917,
+      "mint": "P"
+    },
+    {
+      "year": 1917,
+      "mint": "S"
+    },
+    {
+      "year": 1918,
+      "mint": "D"
+    },
+    {
+      "year": 1918,
+      "mint": "P"
+    },
+    {
+      "year": 1918,
+      "mint": "S"
+    },
+    {
+      "year": 1919,
+      "mint": "D"
+    },
+    {
+      "year": 1919,
+      "mint": "P"
+    },
+    {
+      "year": 1919,
+      "mint": "S"
+    },
+    {
+      "year": 1920,
+      "mint": "D"
+    },
+    {
+      "year": 1920,
+      "mint": "P"
+    },
+    {
+      "year": 1920,
+      "mint": "S"
+    },
+    {
+      "year": 1921,
+      "mint": "P"
+    },
+    {
+      "year": 1921,
+      "mint": "S"
+    },
+    {
+      "year": 1922,
+      "mint": "D"
+    },
+    {
+      "year": 1922,
+      "mint": "D",
+      "key_date": true,
+      "note": "No D (die-filled mintmark, key variety)"
+    },
+    {
+      "year": 1923,
+      "mint": "P"
+    },
+    {
+      "year": 1923,
+      "mint": "S"
+    },
+    {
+      "year": 1924,
+      "mint": "D"
+    },
+    {
+      "year": 1924,
+      "mint": "P"
+    },
+    {
+      "year": 1924,
+      "mint": "S"
+    },
+    {
+      "year": 1925,
+      "mint": "D"
+    },
+    {
+      "year": 1925,
+      "mint": "P"
+    },
+    {
+      "year": 1925,
+      "mint": "S"
+    },
+    {
+      "year": 1926,
+      "mint": "D"
+    },
+    {
+      "year": 1926,
+      "mint": "P"
+    },
+    {
+      "year": 1926,
+      "mint": "S"
+    },
+    {
+      "year": 1927,
+      "mint": "D"
+    },
+    {
+      "year": 1927,
+      "mint": "P"
+    },
+    {
+      "year": 1927,
+      "mint": "S"
+    },
+    {
+      "year": 1928,
+      "mint": "D"
+    },
+    {
+      "year": 1928,
+      "mint": "P"
+    },
+    {
+      "year": 1928,
+      "mint": "S"
+    },
+    {
+      "year": 1929,
+      "mint": "D"
+    },
+    {
+      "year": 1929,
+      "mint": "P"
+    },
+    {
+      "year": 1929,
+      "mint": "S"
+    },
+    {
+      "year": 1930,
+      "mint": "D"
+    },
+    {
+      "year": 1930,
+      "mint": "P"
+    },
+    {
+      "year": 1930,
+      "mint": "S"
+    },
+    {
+      "year": 1931,
+      "mint": "D"
+    },
+    {
+      "year": 1931,
+      "mint": "P"
+    },
+    {
+      "year": 1931,
+      "mint": "S",
+      "key_date": true
+    },
+    {
+      "year": 1932,
+      "mint": "D"
+    },
+    {
+      "year": 1932,
+      "mint": "P"
+    },
+    {
+      "year": 1933,
+      "mint": "D"
+    },
+    {
+      "year": 1933,
+      "mint": "P"
+    },
+    {
+      "year": 1934,
+      "mint": "D"
+    },
+    {
+      "year": 1934,
+      "mint": "P"
+    },
+    {
+      "year": 1935,
+      "mint": "D"
+    },
+    {
+      "year": 1935,
+      "mint": "P"
+    },
+    {
+      "year": 1935,
+      "mint": "S"
+    },
+    {
+      "year": 1936,
+      "mint": "D"
+    },
+    {
+      "year": 1936,
+      "mint": "P"
+    },
+    {
+      "year": 1936,
+      "mint": "S"
+    },
+    {
+      "year": 1937,
+      "mint": "D"
+    },
+    {
+      "year": 1937,
+      "mint": "P"
+    },
+    {
+      "year": 1937,
+      "mint": "S"
+    },
+    {
+      "year": 1938,
+      "mint": "D"
+    },
+    {
+      "year": 1938,
+      "mint": "P"
+    },
+    {
+      "year": 1938,
+      "mint": "S"
+    },
+    {
+      "year": 1939,
+      "mint": "D"
+    },
+    {
+      "year": 1939,
+      "mint": "P"
+    },
+    {
+      "year": 1939,
+      "mint": "S"
+    },
+    {
+      "year": 1940,
+      "mint": "D"
+    },
+    {
+      "year": 1940,
+      "mint": "P"
+    },
+    {
+      "year": 1940,
+      "mint": "S"
+    },
+    {
+      "year": 1941,
+      "mint": "D"
+    },
+    {
+      "year": 1941,
+      "mint": "P"
+    },
+    {
+      "year": 1941,
+      "mint": "S"
+    },
+    {
+      "year": 1942,
+      "mint": "D"
+    },
+    {
+      "year": 1942,
+      "mint": "P"
+    },
+    {
+      "year": 1942,
+      "mint": "S"
+    },
+    {
+      "year": 1943,
+      "mint": "D",
+      "note": "zinc-coated steel (wartime)"
+    },
+    {
+      "year": 1943,
+      "mint": "P",
+      "note": "zinc-coated steel (wartime)"
+    },
+    {
+      "year": 1943,
+      "mint": "S",
+      "note": "zinc-coated steel (wartime)"
+    },
+    {
+      "year": 1944,
+      "mint": "D"
+    },
+    {
+      "year": 1944,
+      "mint": "P"
+    },
+    {
+      "year": 1944,
+      "mint": "S"
+    },
+    {
+      "year": 1945,
+      "mint": "D"
+    },
+    {
+      "year": 1945,
+      "mint": "P"
+    },
+    {
+      "year": 1945,
+      "mint": "S"
+    },
+    {
+      "year": 1946,
+      "mint": "D"
+    },
+    {
+      "year": 1946,
+      "mint": "P"
+    },
+    {
+      "year": 1946,
+      "mint": "S"
+    },
+    {
+      "year": 1947,
+      "mint": "D"
+    },
+    {
+      "year": 1947,
+      "mint": "P"
+    },
+    {
+      "year": 1947,
+      "mint": "S"
+    },
+    {
+      "year": 1948,
+      "mint": "D"
+    },
+    {
+      "year": 1948,
+      "mint": "P"
+    },
+    {
+      "year": 1948,
+      "mint": "S"
+    },
+    {
+      "year": 1949,
+      "mint": "D"
+    },
+    {
+      "year": 1949,
+      "mint": "P"
+    },
+    {
+      "year": 1949,
+      "mint": "S"
+    },
+    {
+      "year": 1950,
+      "mint": "D"
+    },
+    {
+      "year": 1950,
+      "mint": "P"
+    },
+    {
+      "year": 1950,
+      "mint": "S"
+    },
+    {
+      "year": 1951,
+      "mint": "D"
+    },
+    {
+      "year": 1951,
+      "mint": "P"
+    },
+    {
+      "year": 1951,
+      "mint": "S"
+    },
+    {
+      "year": 1952,
+      "mint": "D"
+    },
+    {
+      "year": 1952,
+      "mint": "P"
+    },
+    {
+      "year": 1952,
+      "mint": "S"
+    },
+    {
+      "year": 1953,
+      "mint": "D"
+    },
+    {
+      "year": 1953,
+      "mint": "P"
+    },
+    {
+      "year": 1953,
+      "mint": "S"
+    },
+    {
+      "year": 1954,
+      "mint": "D"
+    },
+    {
+      "year": 1954,
+      "mint": "P"
+    },
+    {
+      "year": 1954,
+      "mint": "S"
+    },
+    {
+      "year": 1955,
+      "mint": "D"
+    },
+    {
+      "year": 1955,
+      "mint": "P"
+    },
+    {
+      "year": 1955,
+      "mint": "S"
+    },
+    {
+      "year": 1956,
+      "mint": "D"
+    },
+    {
+      "year": 1956,
+      "mint": "P"
+    },
+    {
+      "year": 1957,
+      "mint": "D"
+    },
+    {
+      "year": 1957,
+      "mint": "P"
+    },
+    {
+      "year": 1958,
+      "mint": "D"
+    },
+    {
+      "year": 1958,
+      "mint": "P"
+    }
+  ]
+}

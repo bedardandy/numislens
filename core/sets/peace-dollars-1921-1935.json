@@ -1,0 +1,107 @@
+{
+  "id": "peace-dollars-1921-1935",
+  "name": "Peace Dollars (1921-1935)",
+  "series": "Peace Dollar",
+  "composition_ref": "90% silver dollar",
+  "slots": [
+    {
+      "year": 1921,
+      "mint": "P",
+      "key_date": true,
+      "note": "high relief (first year of issue)"
+    },
+    {
+      "year": 1922,
+      "mint": "P"
+    },
+    {
+      "year": 1922,
+      "mint": "D"
+    },
+    {
+      "year": 1922,
+      "mint": "S"
+    },
+    {
+      "year": 1923,
+      "mint": "P"
+    },
+    {
+      "year": 1923,
+      "mint": "D"
+    },
+    {
+      "year": 1923,
+      "mint": "S"
+    },
+    {
+      "year": 1924,
+      "mint": "P"
+    },
+    {
+      "year": 1924,
+      "mint": "S"
+    },
+    {
+      "year": 1925,
+      "mint": "P"
+    },
+    {
+      "year": 1925,
+      "mint": "S"
+    },
+    {
+      "year": 1926,
+      "mint": "P"
+    },
+    {
+      "year": 1926,
+      "mint": "D"
+    },
+    {
+      "year": 1926,
+      "mint": "S"
+    },
+    {
+      "year": 1927,
+      "mint": "P"
+    },
+    {
+      "year": 1927,
+      "mint": "D"
+    },
+    {
+      "year": 1927,
+      "mint": "S"
+    },
+    {
+      "year": 1928,
+      "mint": "P",
+      "key_date": true
+    },
+    {
+      "year": 1928,
+      "mint": "S"
+    },
+    {
+      "year": 1934,
+      "mint": "P"
+    },
+    {
+      "year": 1934,
+      "mint": "D"
+    },
+    {
+      "year": 1934,
+      "mint": "S"
+    },
+    {
+      "year": 1935,
+      "mint": "P"
+    },
+    {
+      "year": 1935,
+      "mint": "S"
+    }
+  ]
+}

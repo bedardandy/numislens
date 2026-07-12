@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://numislens.local/schemas/manifest.schema.json",
+  "title": "NumisLens Set Manifest",
+  "description": "Authoritative slot list for a coin set (year, mint, optional key-date flag and note).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "composition_ref", "slots"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for the set (e.g. filename stem)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable set title."
+    },
+    "series": {
+      "type": "string",
+      "description": "Optional series or type label."
+    },
+    "composition_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to a composition record (e.g. metal content label)."
+    },
+    "slots": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered list of collection slots.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["year", "mint"],
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 1600,
+            "maximum": 2100,
+            "description": "Coin year."
+          },
+          "mint": {
+            "type": "string",
+            "enum": ["P", "D", "S", "O", "CC", "W"],
+            "description": "Mint mark."
+          },
+          "key_date": {
+            "type": "boolean",
+            "description": "Whether this slot is a key date or variety."
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional disambiguating note (e.g. variety name)."
+          }
+        }
+      }
+    }
+  }
+}
