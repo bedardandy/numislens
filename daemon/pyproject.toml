@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "numislens-daemon"
+version = "0.1.0"
+description = "NumisLens FastAPI daemon"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "fpdf2",
+    "segno",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[project.scripts]
+numislens-daemon = "numislens_daemon.__main__:main"
+
+[tool.setuptools]
+packages = ["numislens_daemon"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
