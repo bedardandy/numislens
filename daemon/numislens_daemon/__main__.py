@@ -39,7 +39,7 @@ def main() -> None:
         help="SQLite database path (default: NUMISLENS_DB or ~/.local/share/numislens/numislens.db)",
     )
     parser.add_argument("--host", default="127.0.0.1", help="Bind host")
-    parser.add_argument("--port", default=8000, type=int, help="Bind port")
+    parser.add_argument("--port", default=8471, type=int, help="Bind port")
     parser.add_argument(
         "--images-dir",
         default=None,

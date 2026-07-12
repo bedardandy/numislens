@@ -38,7 +38,7 @@ async def test_find_coins_passes_filters() -> None:
         route = mock.get("/api/v1/coins").mock(
             return_value=Response(200, json=[{"accession_no": "NL-000001"}])
         )
-        out = await find_coins(series="Peace Dollar", year=1921, mint="D")
+        out = await find_coins(series="Peace Dollar", year=1921, mintmark="D")
         assert route.called
         sent = route.calls.last.request
         assert sent.headers["Authorization"] == "Bearer testtoken"

@@ -37,13 +37,12 @@ def _body(**kwargs: Any) -> dict[str, Any]:
 async def find_coins(
     series: Optional[str] = None,
     year: Optional[int] = None,
-    mint: Optional[str] = None,
+    mintmark: Optional[str] = None,
     location_id: Optional[int] = None,
 ) -> str:
     """Search the collection ledger for coins matching optional filters.
 
-    The ``mint`` argument maps to the API query parameter ``mintmark`` (the coin
-    field is called mintmark). ``location_id`` filters recursively by the
+    ``location_id`` filters recursively by the
     location subtree (cabinet, box, tray, slot, etc.).
 
     Returns a JSON array of coin records. Money fields are integer cents with
@@ -55,8 +54,8 @@ async def find_coins(
             params["series"] = series
         if year is not None:
             params["year"] = year
-        if mint is not None:
-            params["mintmark"] = mint
+        if mintmark is not None:
+            params["mintmark"] = mintmark
         if location_id is not None:
             params["location_id"] = location_id
         result = await _client().request_json("GET", "/api/v1/coins", params=params or None)

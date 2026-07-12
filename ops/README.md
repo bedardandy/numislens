@@ -50,7 +50,7 @@ For the systemd unit below, put the token in `~/.config/numislens/daemon.env` as
 Run manually (binds localhost only):
 
 ```bash
-numislens-daemon --db PATH --host 127.0.0.1 --port 8000
+numislens-daemon --db PATH --host 127.0.0.1 --port 8471
 ```
 
 The daemon listens on `127.0.0.1` and must **never** be port-forwarded raw to the internet.
@@ -58,7 +58,7 @@ The daemon listens on `127.0.0.1` and must **never** be port-forwarded raw to th
 Expose over Tailscale (TLS on your tailnet; cloud assistants use the bearer token):
 
 ```bash
-tailscale serve --bg 8000
+tailscale serve --bg 8471
 ```
 
 Install the user unit (not enabled by this repo):
@@ -86,7 +86,7 @@ pip install -e surfaces/mcp          # console script: numislens-mcp
 The MCP server reads two environment variables:
 
 - `NUMISLENS_URL` — daemon base URL (default `http://127.0.0.1:8471`; set it to
-  wherever the daemon actually listens, e.g. `http://127.0.0.1:8000` or your
+  wherever the daemon actually listens, e.g. your
   `tailscale serve` URL).
 - `NUMISLENS_TOKEN` — the same bearer token the daemon uses (required; the
   server exits with a clear message if it is unset).
