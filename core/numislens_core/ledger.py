@@ -41,6 +41,17 @@ class SlotError(LedgerError):
     pass
 
 
+class MoveConflict(LedgerError):
+    def __init__(self, accession: str, expected_from: int | None, actual: int | None) -> None:
+        self.accession = accession
+        self.expected_from = expected_from
+        self.actual = actual
+        super().__init__(
+            f'move conflict for {accession}: expected location {expected_from}, '
+            f'but coin is at {actual}'
+        )
+
+
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -588,13 +599,15 @@ class Ledger:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def move_coin(self, accession: str, location_id: int) -> None:
+    def move_coin(self, accession: str, location_id: int, expected_from: int | None = None) -> None:
         coin_id = self._coin_id(accession)
         self._verify_location(location_id)
         row = self.conn.execute(
             "SELECT location_id FROM coins WHERE id = ?", (coin_id,)
         ).fetchone()
         from_location = row["location_id"]
+        if expected_from is not None and from_location != expected_from:
+            raise MoveConflict(accession, expected_from, from_location)
         now = _utcnow()
         with self.conn:
             self.conn.execute("PRAGMA foreign_keys = ON")

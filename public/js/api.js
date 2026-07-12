@@ -126,10 +126,12 @@ export function uploadCoinImage(accession, kind, blob, filename) {
   return apiUpload('/api/v1/coins/' + encodeURIComponent(accession) + '/images', fd);
 }
 
-export function moveCoin(accession, locationId) {
+export function moveCoin(accession, locationId, expectedFrom) {
+  const body = { location_id: locationId };
+  if (expectedFrom != null) body.expected_from_location_id = expectedFrom;
   return apiFetch(`/api/v1/coins/${encodeURIComponent(accession)}/move`, {
     method: 'POST',
-    body: JSON.stringify({ location_id: locationId }),
+    body: JSON.stringify(body),
   });
 }
 

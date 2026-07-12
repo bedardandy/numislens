@@ -103,7 +103,7 @@ def get_coin_image(
 
 @router.post("/coins/{accession}/move", tags=["coins"])
 def move_coin(accession: str, body: MoveBody, ldb: LedgerDep) -> dict | None:
-    ldb.move_coin(accession, body.location_id)
+    ldb.move_coin(accession, body.location_id, expected_from=body.expected_from_location_id)
     return serialize_coin(ldb.get_coin(accession))
 
 

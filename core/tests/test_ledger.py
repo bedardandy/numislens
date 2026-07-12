@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from numislens_core import MoveConflict
 from numislens_core.ledger import (
     CoinNotFound,
     Ledger,
@@ -333,3 +334,40 @@ def test_move_coin_unknown_location_raises_location_not_found(ledger):
     accession = ledger.add_coin()
     with pytest.raises(LocationNotFound):
         ledger.move_coin(accession, 9999)
+
+
+def test_move_coin_conflict_raises(ledger):
+    loc_a = ledger.create_location("cabinet", "A")
+    loc_b = ledger.create_location("cabinet", "B")
+    accession = ledger.add_coin(location_id=loc_a)
+    coin_id = ledger.get_coin(accession)["id"]
+
+    with pytest.raises(MoveConflict) as exc_info:
+        ledger.move_coin(accession, loc_b, expected_from=loc_b)
+
+    assert exc_info.value.accession == accession
+    assert exc_info.value.expected_from == loc_b
+    assert exc_info.value.actual == loc_a
+    assert ledger.get_coin(accession)["location_id"] == loc_a
+
+    row = ledger.conn.execute(
+        "SELECT event_type FROM events WHERE coin_id = ? AND event_type = 'moved'",
+        (coin_id,),
+    ).fetchone()
+    assert row is None
+
+
+def test_move_coin_with_matching_expected_from_succeeds(ledger):
+    loc_a = ledger.create_location("cabinet", "A")
+    loc_b = ledger.create_location("cabinet", "B")
+    accession = ledger.add_coin(location_id=loc_a)
+    ledger.move_coin(accession, loc_b, expected_from=loc_a)
+    assert ledger.get_coin(accession)["location_id"] == loc_b
+
+
+def test_move_coin_without_expected_from_unchanged(ledger):
+    loc_a = ledger.create_location("cabinet", "A")
+    loc_b = ledger.create_location("cabinet", "B")
+    accession = ledger.add_coin(location_id=loc_a)
+    ledger.move_coin(accession, loc_b)
+    assert ledger.get_coin(accession)["location_id"] == loc_b

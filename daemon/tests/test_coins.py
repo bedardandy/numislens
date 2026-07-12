@@ -142,3 +142,103 @@ def test_move_unknown_coin_404(client: TestClient, auth_headers: dict[str, str])
         headers=auth_headers,
     )
     assert response.status_code == 404
+
+
+def test_move_conflict_409(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    loc_a = client.post(
+        "/api/v1/locations",
+        json={"kind": "box", "label": "A"},
+        headers=auth_headers,
+    )
+    assert loc_a.status_code == 200
+    location_a = loc_a.json()["id"]
+
+    loc_b = client.post(
+        "/api/v1/locations",
+        json={"kind": "box", "label": "B"},
+        headers=auth_headers,
+    )
+    assert loc_b.status_code == 200
+    location_b = loc_b.json()["id"]
+
+    acc = make_coin({"location_id": location_a})
+
+    move = client.post(
+        f"/api/v1/coins/{acc}/move",
+        json={"location_id": location_b, "expected_from_location_id": location_b},
+        headers=auth_headers,
+    )
+    assert move.status_code == 409
+    assert "move conflict" in move.json()["detail"]
+
+    coin = client.get(f"/api/v1/coins/{acc}", headers=auth_headers)
+    assert coin.status_code == 200
+    assert coin.json()["location_id"] == location_a
+
+
+def test_move_with_correct_expected_from_200(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    loc_a = client.post(
+        "/api/v1/locations",
+        json={"kind": "box", "label": "A"},
+        headers=auth_headers,
+    )
+    assert loc_a.status_code == 200
+    location_a = loc_a.json()["id"]
+
+    loc_b = client.post(
+        "/api/v1/locations",
+        json={"kind": "box", "label": "B"},
+        headers=auth_headers,
+    )
+    assert loc_b.status_code == 200
+    location_b = loc_b.json()["id"]
+
+    acc = make_coin({"location_id": location_a})
+
+    move = client.post(
+        f"/api/v1/coins/{acc}/move",
+        json={"location_id": location_b, "expected_from_location_id": location_a},
+        headers=auth_headers,
+    )
+    assert move.status_code == 200
+    assert move.json()["location_id"] == location_b
+
+
+def test_move_without_expected_from_200(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    loc_a = client.post(
+        "/api/v1/locations",
+        json={"kind": "box", "label": "A"},
+        headers=auth_headers,
+    )
+    assert loc_a.status_code == 200
+    location_a = loc_a.json()["id"]
+
+    loc_b = client.post(
+        "/api/v1/locations",
+        json={"kind": "box", "label": "B"},
+        headers=auth_headers,
+    )
+    assert loc_b.status_code == 200
+    location_b = loc_b.json()["id"]
+
+    acc = make_coin({"location_id": location_a})
+
+    move = client.post(
+        f"/api/v1/coins/{acc}/move",
+        json={"location_id": location_b},
+        headers=auth_headers,
+    )
+    assert move.status_code == 200
+    assert move.json()["location_id"] == location_b

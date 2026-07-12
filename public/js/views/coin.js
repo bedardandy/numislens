@@ -226,7 +226,7 @@ export async function renderCoin(el, accession) {
     } catch (err) {
       if (isNetworkError(err)) {
         try {
-          await enqueueMove(accession, selectedId);
+          await enqueueMove(accession, selectedId, coin.location_id != null ? coin.location_id : null);
           toast('Move queued — will sync when back online', 'info');
           movePicker.style.display = 'none';
           await refreshQueueBanner();

@@ -6,6 +6,7 @@ from .ledger import (
     Ledger,
     LedgerError,
     LocationNotFound,
+    MoveConflict,
     SetNotFound,
     SlotError,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "LocationNotFound",
     "SetNotFound",
     "SlotError",
+    "MoveConflict",
     "load_manifest",
     "validate_manifest",
     "ManifestError",

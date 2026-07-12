@@ -1,4 +1,4 @@
-const CACHE_NAME = 'numislens-v5';
+const CACHE_NAME = 'numislens-v6';
 
 const PRECACHE_URLS = [
   '/',

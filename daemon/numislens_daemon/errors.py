@@ -10,6 +10,7 @@ from numislens_core import (
     LedgerError,
     LocationNotFound,
     ManifestError,
+    MoveConflict,
     SetNotFound,
     SlotError,
 )
@@ -52,6 +53,10 @@ def register_error_handlers(app: FastAPI) -> None:
         request: Request, exc: SlotError
     ) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    @app.exception_handler(MoveConflict)
+    async def move_conflict_handler(request: Request, exc: MoveConflict) -> JSONResponse:
+        return JSONResponse(status_code=409, content={'detail': str(exc)})
 
     @app.exception_handler(LedgerError)
     async def ledger_error_handler(

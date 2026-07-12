@@ -25,8 +25,13 @@ export function offlineBanner(cachedAt) {
   return banner;
 }
 
-export async function enqueueMove(accession, locationId) {
-  await queueAdd({ accession, location_id: locationId, queued_at: new Date().toISOString() });
+export async function enqueueMove(accession, locationId, expectedFrom) {
+  await queueAdd({
+    accession,
+    location_id: locationId,
+    expected_from: expectedFrom != null ? expectedFrom : null,
+    queued_at: new Date().toISOString(),
+  });
 }
 
 export async function listQueuedMoves() {
@@ -51,9 +56,13 @@ export async function replayMoveQueue() {
     const items = await listQueuedMoves();
     for (const item of items) {
       try {
-        await moveCoin(item.record.accession, item.record.location_id);
+        await moveCoin(item.record.accession, item.record.location_id, item.record.expected_from);
       } catch (err) {
-        return { replayed, stopped: true, error: err.message, record: item.record };
+        let message = err.message;
+        if (err.status === 409) {
+          message = item.record.accession + ' moved elsewhere since you queued this \u2014 review and discard or retry (Settings > Queued offline moves). ' + err.message;
+        }
+        return { replayed, stopped: true, error: message, record: item.record };
       }
       await discardMove(item.key);
       replayed += 1;

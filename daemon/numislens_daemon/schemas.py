@@ -41,6 +41,10 @@ class CoinCreate(StrictModel):
 
 class MoveBody(StrictModel):
     location_id: int
+    expected_from_location_id: Optional[int] = Field(
+        default=None,
+        description='Optimistic concurrency: fail with 409 if the coin is no longer at this location.',
+    )
 
 
 class AppraiseBody(StrictModel):
