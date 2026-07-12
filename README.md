@@ -2,6 +2,11 @@
 
 Numislens is a Progressive Web Application (PWA) that uses AI to identify and grade antique and rare coins. Simply take pictures of the front and edge of your coin to get identification, condition grade, and value estimation.
 
+## Repository layout
+
+- **`core/`** — the collection ledger: a dependency-free Python package (`numislens_core`) over a single SQLite database, plus its data (SQL migrations, the compositions seed, and set manifests in `core/sets/`). This is the source of truth for the whole platform. Run its tests with `cd core && python -m pytest`.
+- **`public/`** — the existing vanilla-JS PWA. It is slated for a thin rebuild against the core API in a later phase; treat it as legacy for now.
+
 ## Features
 
 - **AI-Powered Identification**: Uses advanced AI to identify coin types
