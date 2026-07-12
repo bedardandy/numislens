@@ -9,6 +9,7 @@ Numislens is a coin-collection platform built around a single SQLite ledger and 
 - **`ops/`** — operational files: user-level systemd units for the daily melt update, plus Litestream and dump-based backup config. See `ops/README.md` and `ops/BACKUP.md`. Nothing here is installed or enabled automatically.
 - **`surfaces/`** — thin assistant skins over the REST API: a Claude MCP server (`surfaces/mcp/`) and Claude Code skill (`surfaces/claude/SKILL.md`), a ChatGPT Custom GPT Action (`surfaces/chatgpt/`), a Gemini Gem (`surfaces/gemini/`), and Apple Shortcuts recipes (`surfaces/siri/`), all generated from the single committed `surfaces/openapi.json`. Each is a client of the daemon's OpenAPI surface — no business logic. See `surfaces/README.md`.
 - **`public/`** — the thin-client PWA: vanilla ES modules that call the daemon's REST API, with offline read snapshots, an offline move queue, and cycle-count mode. The daemon serves it as static files.
+- **`vision/`** — the tiered photo identification/grading pipeline (`numislens_vision`, own venv). A pure REST client of the daemon + LAN GPU endpoints (OCR + VLM) behind a deterministic agreement gate that never writes a guessed value; disagreements escalate for human/assistant adjudication. See the Vision section below.
 
 ### Core CLI quickstart
 
@@ -68,10 +69,41 @@ Then open the daemon's address in a modern browser, go to **Settings**, and past
 - `public/js/photo.js`, `public/js/money.js`, `public/js/tree.js` — camera capture, dollar-input parsing, location-tree helpers
 - `public/sw.js` — service worker (its precache list is versioned per release)
 
+## Vision — photo identification (Phase 4)
+
+`vision/` runs a tiered photo pipeline over a coin's stored obverse/reverse images and **never writes a guessed value** — the direct descendant of the fabrication bug this project exists to avoid.
+
+- **Tiers.** T1 OCR (PaddleOCR-VL) reads the stamped text; T2 VLM (Qwen) does four separate micro-calls (series/denomination/country, date read **digit-by-digit**, mintmark, condition bucket); an optional T3 (Gemma) is a config-driven third voter. Every model output is canonicalized deterministically at the boundary (enum paraphrases, JSON key-renaming, MS-numerics → condition bucket).
+- **Agreement gate.** Year and mintmark are accepted only when the tiers agree (OCR+VLM unanimity, or 2-of-3 with Gemma); any year that hits a **key-date** slot demands unanimity across all available tiers. Series and grade come from the VLM alone (grade is a photo-grade condition bucket `AG…UNC`, never MS-numeric). Disagreements **escalate** — shown with every tier's reading for a human/assistant (Tier 3) to adjudicate; nothing is guessed.
+- **Writeback (fail-safe).** Accepted fields fill the coin only where NULL (never overwrite user data); grade is written with `grade_source` plus an append-only photo-grade appraisal; escalations write no identification and instead mark the coin **stale** (via the digest endpoint) so it surfaces in `watch/status`.
+
+Setup and run (own venv; a pure REST client — do not install `core` here):
+
+```bash
+python3 -m venv vision/.venv && . vision/.venv/bin/activate && pip install -e vision
+export NUMISLENS_URL=http://127.0.0.1:8471 NUMISLENS_TOKEN=...   # the daemon
+# endpoints (defaults shown): comma-separated OCR boxes w/ failover, one VLM,
+# optional Gemma (unset = skipped, its absence is reported in results)
+export VISION_OCR_URLS=http://beyondmax:8080,http://framedesk:8080
+export VISION_VLM_URL=http://p920-server:8088
+# export VISION_GEMMA_URL=http://elitegpu:8090   # optional third voter
+
+numislens-vision identify NL-000123     # read-only: print the gated result
+numislens-vision process  NL-000123     # + fail-safe writeback for one coin
+numislens-vision process  --pending     # every unidentified coin with images
+numislens-vision status                 # collection-wide vision counts
+```
+
+Claude reaches the same pipeline through the MCP `identify_coin` tool (read-only; install `vision` into the MCP venv). ChatGPT/Gemini surfaces cannot run it (it is a local worker, not a cloud endpoint) — they upload photos and the worker identifies later.
+
+**Benchmark.** `vision/bench/` scores the pipeline against your own staged coins (date and mintmark scored separately and strictly; per-tier and post-gate accuracy; escalation rate). Copy `bench/ground_truth.example.json` to `bench/ground_truth.json`, photograph ~20 known coins, and run `python bench/runner.py bench/ground_truth.json`. See `vision/bench/README.md` for the protocol; the one synthetic entry only proves the harness runs and is excluded from accuracy.
+
 ## Testing
 
 - Core: `cd core && python3 -m pytest`
 - Daemon: `cd daemon && python3 -m pytest`
+- Vision: `cd vision && python3 -m pytest` (own venv; mocked HTTP, no live GPUs)
+- MCP: `cd surfaces/mcp && python3 -m pytest` (own venv; requires `pip install -e vision`)
 - PWA smoke: `python3 scripts/e2e_smoke.py` (scratch daemon + temp DB) and `python3 scripts/check_sw_files.py` (service-worker precache list vs. files on disk)
 - OpenAPI artifact: `python3 scripts/export_openapi.py` regenerates `surfaces/openapi.json` and asserts every `/api/v1` path is present and bearer-secured
 

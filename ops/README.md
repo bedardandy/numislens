@@ -83,6 +83,52 @@ with the cheapest model tier and record the result with record_appraisal
 stale flag. Do not touch any coin outside the watchlist.
 ```
 
+## Vision pipeline (Phase 4)
+
+The tiered photo identification/grading pipeline lives in `vision/` — its own
+package and venv, a pure REST client of the daemon and the LAN GPU endpoints
+(no `numislens_core` import, no direct DB). It never writes a guessed value: a
+deterministic agreement gate accepts a field only when the tiers agree, and
+escalates disagreements for human/assistant adjudication.
+
+```bash
+python3 -m venv vision/.venv && . vision/.venv/bin/activate && pip install -e vision
+```
+
+Configuration is entirely environment-driven:
+
+- `NUMISLENS_URL` / `NUMISLENS_TOKEN` — the daemon (same token the daemon uses).
+- `VISION_OCR_URLS` — comma-separated OCR endpoints, tried in order with
+  failover (default `http://beyondmax:8080,http://framedesk:8080`).
+- `VISION_VLM_URL` — the vision-LLM cross-vote endpoint (default
+  `http://p920-server:8088`).
+- `VISION_GEMMA_URL` — **optional** third voter. Unset by default; when unset or
+  unreachable the pipeline runs on OCR+VLM and reports Gemma's absence in
+  `tiers_unavailable`. It is never assumed up and never fatal.
+
+Commands (sequential, one coin at a time — the GPUs are shared, no hammering):
+
+```bash
+numislens-vision identify NL-000123   # read-only: run the pipeline, print result
+numislens-vision process  NL-000123   # + fail-safe writeback for one coin
+numislens-vision process  --pending   # every UNIDENTIFIED coin with images and
+                                       #   no prior vision appraisal (idempotent)
+numislens-vision status               # collection-wide vision counts
+```
+
+Writeback is fail-safe: accepted fields fill only NULL columns (never overwrite
+user data); grade is recorded with `grade_source` plus an append-only
+photo-grade appraisal; escalations write no identification and mark the coin
+stale so it surfaces in `GET /api/v1/watch/status` for review. The unattended
+`--pending` run is the batch writer; the MCP `identify_coin` tool is the
+interactive, read-only counterpart (adjudicate escalations yourself, then record
+via existing tools).
+
+**Benchmark.** `vision/bench/` scores the pipeline against your own staged
+photos — see `vision/bench/README.md` for the ~20-coin protocol. Copy
+`bench/ground_truth.example.json` to `bench/ground_truth.json` and run
+`python bench/runner.py bench/ground_truth.json`.
+
 ## Backups
 
 See [ops/BACKUP.md](BACKUP.md) for Litestream replication and dump-based backup/restore.
@@ -153,8 +199,13 @@ client and talks to the daemon over HTTP with the same bearer token.
 
 ```bash
 python3 -m venv surfaces/mcp/.venv && . surfaces/mcp/.venv/bin/activate
-pip install -e surfaces/mcp          # console script: numislens-mcp
+pip install -e vision -e surfaces/mcp   # console script: numislens-mcp
 ```
+
+`identify_coin` runs the Phase-4 vision pipeline in-process, so install the local
+`vision` package into the MCP venv (the `-e vision` above). Without it, the MCP
+server still starts and every other tool works; `identify_coin` returns a clear
+"numislens-vision is not installed" message.
 
 The MCP server reads two environment variables:
 

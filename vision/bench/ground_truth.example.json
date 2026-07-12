@@ -1,0 +1,41 @@
+{
+  "_comment": "Copy to ground_truth.json and fill with ~20 of YOUR coins (known attributions, varied grades/lighting). obverse/reverse are paths relative to this file; mintmark null means the coin has no mintmark; a null series/year/grade_bucket skips scoring that field. The one synthetic entry proves the harness runs and is EXCLUDED from accuracy.",
+  "image_pairs": [
+    {
+      "id": "example-1943-d-wheat-cent",
+      "obverse": "images/1943-d-obv.jpg",
+      "reverse": "images/1943-d-rev.jpg",
+      "truth": {
+        "series": "Lincoln Wheat Cent",
+        "year": 1943,
+        "mintmark": "D",
+        "grade_bucket": "VF"
+      },
+      "synthetic": false
+    },
+    {
+      "id": "example-1921-peace-dollar",
+      "obverse": "images/1921-peace-obv.jpg",
+      "reverse": "images/1921-peace-rev.jpg",
+      "truth": {
+        "series": "Peace Dollar",
+        "year": 1921,
+        "mintmark": null,
+        "grade_bucket": "XF"
+      },
+      "synthetic": false
+    },
+    {
+      "id": "synthetic-smoke-1943-d",
+      "obverse": "synthetic",
+      "reverse": "synthetic",
+      "truth": {
+        "series": "Lincoln Wheat Cent",
+        "year": 1943,
+        "mintmark": "D",
+        "grade_bucket": null
+      },
+      "synthetic": true
+    }
+  ]
+}

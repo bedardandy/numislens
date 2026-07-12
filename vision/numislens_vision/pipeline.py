@@ -69,6 +69,35 @@ def identify(cfg: VisionConfig, accession: str, client: DaemonClient | None = No
     known_series = client.known_series()
     key_date_years = client.key_date_years()
 
+    tiered = run_tiers_and_gate(
+        cfg, images, known_series=known_series, key_date_years=key_date_years
+    )
+    # Drop the raw dataclass readings — identify()'s result is returned verbatim
+    # by the MCP tool / CLI and must stay JSON-serializable.
+    tiered.pop("readings", None)
+
+    result: dict[str, Any] = {"accession": accession, **tiered}
+    if image_notes:
+        result["image_notes"] = image_notes
+    return result
+
+
+def run_tiers_and_gate(
+    cfg: VisionConfig,
+    images: list[Image64],
+    *,
+    known_series: list[str],
+    key_date_years: set[int],
+) -> dict:
+    """Run T1/T2/T3 + the gate over prepared images. Daemon-free core.
+
+    Shared by identify() (daemon-backed) and the benchmark harness (file-backed).
+    Returns the tier readings AND the gated result so callers can score each tier
+    independently.
+    """
+    tiers_used: list[str] = []
+    tiers_unavailable: list[str] = []
+
     ocr = tiers.run_ocr(cfg, images)
     if ocr.available:
         tiers_used.append(f"ocr:{ocr.url_used}")
@@ -89,13 +118,10 @@ def identify(cfg: VisionConfig, accession: str, client: DaemonClient | None = No
 
     gated = run_gate(ocr, vlm, gemma, key_date_years=key_date_years)
 
-    result: dict[str, Any] = {
-        "accession": accession,
+    return {
         "accepted": gated["accepted"],
         "escalations": gated["escalations"],
         "tiers_used": tiers_used,
         "tiers_unavailable": tiers_unavailable,
+        "readings": {"ocr": ocr, "vlm": vlm, "gemma": gemma},
     }
-    if image_notes:
-        result["image_notes"] = image_notes
-    return result
