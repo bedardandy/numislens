@@ -63,14 +63,41 @@ quick-add parsing live on the daemon. Follow these rules exactly.
   if uploaded via **POST `/api/v1/coins/{accession}/images`**, and tell the user
   automated identification/grading is not available yet.
 
-## Value-watch etiquette (token efficiency)
+## Value-watch etiquette (token efficiency) — operating procedure
 
-- Do not re-appraise the whole collection. **POST `/api/v1/melt/update`** at most once
-  per day.
-- Per-coin market lookups are only for top-value / watchlist coins or when the user
-  explicitly asks about a specific coin — not a routine sweep across everything.
-- The daily melt tier (**GET `/api/v1/melt/status`**) is free and deterministic; lean
-  on it before spending appraisal effort.
+The collection is watched with three mechanisms, cheapest first. **Never re-appraise
+the whole collection.** Follow this cadence:
+
+1. **Melt is automatic (daily, 0 tokens).** The daemon reprices every melt-basis coin
+   from spot on a cron. NEVER recompute melt yourself and NEVER re-appraise a
+   melt-basis coin (junk silver, bullion) — its value simply *is* melt. Use **GET
+   `/api/v1/melt/status`** (stored, no network) for melt questions; run **POST
+   `/api/v1/melt/update`** at most once daily.
+
+2. **Weekly digest (one sweep, one call).** Do ONE web-search sweep — "US coin market
+   movers, auction records, series news" — distill it into structured items, and
+   submit them in a SINGLE **POST `/api/v1/watch/digest`** call with body
+   `{"items": [...]}`. Never run per-coin searches for this. Each item names EXACTLY
+   ONE target (`series`, `set_id`, or `accessions`) plus a `reason`, and should cite a
+   `source_note` — do NOT mark stale on a hunch. `series` is a case-insensitive exact
+   match against series you actually hold; an unknown series returns **422** listing
+   what DOES exist and marks nothing (relay it, do not retry a guess). The digest only
+   flags coins stale; it changes no values.
+
+3. **Monthly watchlist sweep (top-N only).** Call **GET `/api/v1/watch/status?n=25`**
+   and read `watchlist`; do an individual market check for ONLY those top-value coins,
+   using the cheapest model tier. Record each result with **POST
+   `/api/v1/coins/{accession}/appraise`** (rationale + source) — recording an appraisal
+   CLEARS that coin's staleness. Never sweep the long tail unprompted.
+
+4. **Stale coins re-appraise lazily.** A coin in the `stale` list from **GET
+   `/api/v1/watch/status`** is a re-appraisal TODO, not a changed value — its stored
+   value is unchanged until an appraisal is recorded. Re-appraise a stale coin when it
+   is next viewed or when the user asks, not eagerly.
+
+5. **Never appraise the long tail unprompted.** Low-value coins are re-appraised on
+   demand only. Spot moves and the digest do the watching for free — a ±10% spot move
+   auto-marks all hybrid/numismatic coins of that metal stale.
 
 ## Recording appraisals
 

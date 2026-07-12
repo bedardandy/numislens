@@ -6,7 +6,7 @@ description: >
 
 # NumisLens
 
-You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `get_label_pdf`. Follow these rules.
+You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `get_label_pdf`, `watch_status`, `list_stale`, `get_watchlist`, `submit_digest`. Follow these rules.
 
 ## Money and melt questions
 
@@ -34,11 +34,43 @@ You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`,
 - The vision identification/grading pipeline is NOT built yet (it is a later phase). Do NOT guess a coin identity, grade, or valuation from a photo and present it as fact.
 - When the user shows or describes a coin to identify: capture what is actually known (record the coin with only the confirmed fields), note that photos were provided, and tell the user that automated identification/grading is not available yet.
 
-## Value-watch etiquette (token efficiency)
+## Value-watch etiquette (token efficiency) — operating procedure
 
-- Do not re-appraise the whole collection. `melt_update` at most once per day.
-- Per-coin market lookups are only for the top-value / watchlist coins or when the user explicitly asks about a specific coin — not a routine sweep across everything.
-- The daily melt tier is free and deterministic; lean on it before spending any model/appraisal effort.
+The collection is watched with three mechanisms, cheapest first. **Never
+re-appraise the whole collection.** Follow this cadence:
+
+1. **Melt is automatic (daily, 0 tokens).** The daemon reprices every melt-basis
+   coin from spot on a cron. NEVER recompute melt yourself and NEVER re-appraise
+   a melt-basis coin (junk silver, bullion) — its value simply *is* melt. For
+   melt questions call `melt_status` (stored, no network); run `melt_update` at
+   most once daily.
+
+2. **Weekly digest (one sweep, one call).** Do ONE web-search sweep — "US coin
+   market movers, auction records, series news" — distill the results into
+   structured items, and submit them in a SINGLE `submit_digest(items)` call.
+   Never run per-coin searches for this. Each item names EXACTLY ONE target
+   (`series`, `set_id`, or `accessions`) plus a `reason`, and should cite a
+   `source_note` — do NOT mark stale on a hunch. `series` is a case-insensitive
+   exact match against series you actually hold; an unknown series returns 422
+   listing what DOES exist and marks nothing (relay it, don't retry a guess).
+   `submit_digest` only flags coins stale; it changes no values.
+
+3. **Monthly watchlist sweep (top-N only).** Call `get_watchlist(25)` and do an
+   individual market check for ONLY those top-value coins, using the cheapest
+   model tier. Record each result with `record_appraisal` (rationale + source);
+   recording an appraisal CLEARS that coin's staleness. Never sweep the long
+   tail unprompted.
+
+4. **Stale coins re-appraise lazily.** A coin flagged stale (see `list_stale` /
+   `watch_status`) is a re-appraisal TODO, not a changed value — its stored
+   value is unchanged until you record an appraisal. Re-appraise a stale coin
+   when it is next viewed or when the user asks, not eagerly.
+
+5. **Never appraise the long tail unprompted.** Low-value coins are re-appraised
+   on demand only. Spot moves and the digest do the watching for free.
+
+Spot silver moving ±10% automatically marks all hybrid/numismatic coins of that
+metal stale (their premiums track spot) — you do not need to trigger that.
 
 ## Recording appraisals
 

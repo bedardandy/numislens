@@ -5,7 +5,7 @@ Numislens is a coin-collection platform built around a single SQLite ledger and 
 ## Repository layout
 
 - **`core/`** — the collection ledger: a dependency-free Python package (`numislens_core`) over a single SQLite database, plus its data (SQL migrations, the compositions seed, and set manifests in `core/sets/`). This is the source of truth for the whole platform. Run its tests with `cd core && python3 -m pytest`.
-- **`daemon/`** — FastAPI REST + OpenAPI surface, bearer auth, label PDFs.
+- **`daemon/`** — FastAPI REST + OpenAPI surface, bearer auth, label PDFs, and the value-watch staleness endpoints (`/watch/status`, `/watch/digest`).
 - **`ops/`** — operational files: user-level systemd units for the daily melt update, plus Litestream and dump-based backup config. See `ops/README.md` and `ops/BACKUP.md`. Nothing here is installed or enabled automatically.
 - **`surfaces/`** — thin assistant skins over the REST API: a Claude MCP server (`surfaces/mcp/`) and Claude Code skill (`surfaces/claude/SKILL.md`), a ChatGPT Custom GPT Action (`surfaces/chatgpt/`), a Gemini Gem (`surfaces/gemini/`), and Apple Shortcuts recipes (`surfaces/siri/`), all generated from the single committed `surfaces/openapi.json`. Each is a client of the daemon's OpenAPI surface — no business logic. See `surfaces/README.md`.
 - **`public/`** — the thin-client PWA: vanilla ES modules that call the daemon's REST API, with offline read snapshots, an offline move queue, and cycle-count mode. The daemon serves it as static files.
@@ -32,6 +32,7 @@ Melt fetching is keyless and fail-loud: it never fabricates a price and exits no
 - **Locations**: nest cabinets → boxes → trays → slots (and albums → pages → pockets); every coin lives in exactly one, and moves are recorded as events.
 - **Set-completion boards**: visual album grids per set with filled/gap slot chips, key-date markers, and an assign-coin picker.
 - **Melt dashboard**: deterministic, keyless precious-metal melt values with a dual-source spot cross-check — never fabricated, fail-loud on source disagreement or staleness.
+- **Value-watch**: token-efficient, three tiers cheapest-first — daily melt (automatic), a weekly market digest that fans one search out to staleness flags (`/watch/digest`), and a monthly top-value watchlist sweep. Staleness is metadata (it never changes a stored value); a ≥10% spot move auto-flags hybrid/numismatic coins, and an appraisal clears the flag. Optional keyless ntfy push on big moves.
 - **Offline-first**: cached read snapshots (always shown with an OFFLINE banner) and a queue for offline coin moves that replays in order when connectivity returns.
 - **Cycle-count mode**: warehouse-style reconciliation of a location's expected contents against what is physically present, with a copyable report.
 - **QR labels**: printable accession labels (PDF) whose QR codes deep-link into the app.

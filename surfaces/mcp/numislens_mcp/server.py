@@ -504,6 +504,126 @@ async def record_appraisal(
 
 
 @mcp.tool(
+    name="watch_status",
+    annotations={
+        "title": "Value-Watch Status",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def watch_status(n: int = 25) -> str:
+    """Value-watch snapshot: stale-coin count + list, top-value watchlist, deltas.
+
+    Returns ``{stale_count, stale, watchlist, delta}``. ``stale`` is the coins
+    flagged for a lazy re-appraisal (each with its reason and since-timestamp),
+    capped at 100 — ``stale_count`` is the true total. ``watchlist`` is the top
+    ``n`` coins by value. This is a READ — it spends nothing. Use it to decide
+    whether the monthly per-coin sweep or a re-appraisal is even warranted.
+    """
+    try:
+        result = await _client().request_json(
+            "GET", "/api/v1/watch/status", params={"n": n}
+        )
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="list_stale",
+    annotations={
+        "title": "List Stale Coins",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def list_stale() -> str:
+    """List coins currently flagged stale (each with reason + since-timestamp).
+
+    A coin is stale when a weekly digest or a >=10% spot move suggested its
+    numismatic premium may have drifted. Staleness is a re-appraisal TODO, not a
+    value change — the stored value is unchanged until you record an appraisal.
+    Returns ``{stale_count, stale}`` (stale list capped at 100).
+    """
+    try:
+        result = await _client().request_json("GET", "/api/v1/watch/status")
+        return _dumps(
+            {"stale_count": result.get("stale_count"), "stale": result.get("stale")}
+        )
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="get_watchlist",
+    annotations={
+        "title": "Get Watchlist",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def get_watchlist(n: int = 25) -> str:
+    """Top ``n`` coins by estimated value — the monthly per-coin sweep set.
+
+    Unappraised (null-value) coins are excluded. These, and ONLY these, are the
+    coins worth an individual market check in the monthly sweep; never sweep the
+    long tail unprompted. Returns the watchlist array of coin records.
+    """
+    try:
+        result = await _client().request_json(
+            "GET", "/api/v1/watch/status", params={"n": n}
+        )
+        return _dumps(result.get("watchlist", []))
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="submit_digest",
+    annotations={
+        "title": "Submit Market Digest",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+)
+async def submit_digest(items: list[dict[str, Any]]) -> str:
+    """THE deterministic sink for your WEEKLY market digest — mark coins stale.
+
+    Do ONE web-search sweep for coin-market movers/auction records/series news,
+    distill it to structured items, and submit them in ONE call — never run
+    per-coin searches for this. Each item names EXACTLY ONE target plus a reason:
+
+      ``{"series": "Morgan Dollar", "reason": "silver rally + strong auctions",
+         "source_note": "Heritage 2026-07 sale"}``
+      ``{"set_id": "peace-dollars-1921-1935", "reason": "set premium re-rate"}``
+      ``{"accessions": ["NL-000012"], "reason": "record price for the date"}``
+
+    ``series`` is a case-insensitive exact match against series you actually
+    hold; an unknown series returns HTTP 422 listing the series that DO exist and
+    marks NOTHING (fail loud — do not retry with a guess). ``source_note`` is
+    folded into the stored reason: never mark stale on a hunch, cite a source.
+
+    This flags coins for a later lazy re-appraisal; it changes no values. Returns
+    ``{items:[...matched counts...], total_marked}``.
+    """
+    try:
+        result = await _client().request_json(
+            "POST", "/api/v1/watch/digest", json={"items": items}
+        )
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
     name="get_label_pdf",
     annotations={
         "title": "Get Label PDF",

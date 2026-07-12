@@ -25,6 +25,64 @@ loginctl enable-linger $USER
 
 The melt service exits non-zero on source disagreement (>2%), staleness (>48h), or network errors. Check `journalctl --user -u numislens-melt.service` for details.
 
+## Value-watch (Phase 6)
+
+Value-watch keeps appraisals cheap: melt is repriced automatically every day
+(the timer above), a **weekly digest** fans one web search out to staleness
+flags, and a **monthly watchlist sweep** re-appraises only the top-value coins.
+The daemon/core stay LLM-free — the assistant does the search + distillation
+*outside* and feeds structured findings into the deterministic
+`POST /api/v1/watch/digest` endpoint.
+
+### Optional keyless push (ntfy)
+
+Set `NUMISLENS_NTFY_URL` to a full ntfy.sh topic URL and `numislens melt update`
+(and `POST /api/v1/melt/update`) will POST a plain-text alert when any metal
+moves more than 3% day-over-day, or when a ≥10% spot move newly flags coins
+stale. Off when unset; a failed push is logged, never fatal.
+
+```bash
+# pick a private topic name; then subscribe on your phone via the ntfy app
+echo 'NUMISLENS_NTFY_URL=https://ntfy.sh/numislens-<your-random-suffix>' >> ~/.config/numislens/daemon.env
+# for the melt timer, add the same line to the melt service Environment= or its env file
+```
+
+### Weekly digest as a Claude scheduled task
+
+Create a weekly scheduled task with this prompt verbatim (it searches, distills,
+and calls the deterministic sink — one call, no per-coin searches):
+
+```
+Run the NumisLens weekly market digest.
+
+1. Do ONE web search for notable US coin market movers, recent auction records,
+   and coin-series news from the past week.
+2. Distill what you find into a list of items, each affecting coins I actually
+   hold. Each item is exactly one target plus a reason and a source:
+     - {"series": "<a series I own>", "reason": "<why it moved>", "source_note": "<citation>"}
+     - {"set_id": "<set key or id>", "reason": "...", "source_note": "..."}
+     - {"accessions": ["NL-000123"], "reason": "...", "source_note": "..."}
+   Only use a series name that appears in my collection; never guess.
+3. Call submit_digest(items) ONCE with that list. If it returns a 422 for an
+   unknown series, drop that item (use the known-series list it returns) and
+   resubmit. Do NOT run per-coin web searches.
+4. Report how many coins were marked stale per item.
+
+Do not re-appraise anything and do not recompute melt — this run only flags
+coins for later lazy re-appraisal.
+```
+
+### Monthly watchlist sweep reminder
+
+Once a month, sweep only the top-value coins (never the long tail):
+
+```
+Call get_watchlist(25). For EACH of those coins only, do a quick market check
+with the cheapest model tier and record the result with record_appraisal
+(include a rationale and source). Recording an appraisal clears that coin's
+stale flag. Do not touch any coin outside the watchlist.
+```
+
 ## Backups
 
 See [ops/BACKUP.md](BACKUP.md) for Litestream replication and dump-based backup/restore.

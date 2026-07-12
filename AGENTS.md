@@ -115,7 +115,7 @@ Run all three before committing anything that touches their area:
 ```bash
 cd core            && python3 -m pytest -q     # 88 tests
 cd daemon          && python3 -m pytest -q     # 76 tests
-cd surfaces/mcp    && python3 -m pytest -q     # 22 tests (needs its own venv)
+cd surfaces/mcp    && python3 -m pytest -q     # 23 tests (needs its own venv)
 node --test tests/js/                           # PWA money helper
 python3 scripts/e2e_smoke.py                    # scratch daemon + temp DB, boots nothing external
 python3 scripts/check_sw_files.py               # sw.js precache list vs files on disk

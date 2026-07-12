@@ -13,12 +13,16 @@ from numislens_mcp.server import (
     find_coins,
     get_coin,
     get_label_pdf,
+    get_watchlist,
+    list_stale,
     locate_coin,
     melt_status,
     melt_update,
     move_coin,
     quick_add,
     set_gaps,
+    submit_digest,
+    watch_status,
 )
 
 
@@ -249,3 +253,84 @@ async def test_melt_update_posts() -> None:
         result = await melt_update()
         assert route.called
         assert json.loads(result)["updated"] == 3
+
+
+async def test_watch_status_passes_n_and_returns_snapshot() -> None:
+    payload = {
+        "stale_count": 2,
+        "stale": [{"accession": "NL-000001", "reason": "silver moved", "since": "x"}],
+        "watchlist": [{"accession_no": "NL-000009", "value_est_cents": 9000}],
+        "delta": {"XAG": {"pct": 4.2}},
+    }
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.get("/api/v1/watch/status").mock(
+            return_value=Response(200, json=payload)
+        )
+        result = await watch_status(n=10)
+        assert route.called
+        assert route.calls.last.request.url.params["n"] == "10"
+    parsed = json.loads(result)
+    assert parsed["stale_count"] == 2
+    assert parsed["watchlist"][0]["value_est_cents"] == 9000
+
+
+async def test_list_stale_projects_stale_only() -> None:
+    payload = {
+        "stale_count": 1,
+        "stale": [{"accession": "NL-000001", "reason": "digest", "since": "x"}],
+        "watchlist": [{"accession_no": "NL-000009"}],
+        "delta": {},
+    }
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.get("/api/v1/watch/status").mock(return_value=Response(200, json=payload))
+        result = await list_stale()
+    parsed = json.loads(result)
+    assert parsed["stale_count"] == 1
+    assert "watchlist" not in parsed
+    assert parsed["stale"][0]["reason"] == "digest"
+
+
+async def test_get_watchlist_returns_array() -> None:
+    payload = {
+        "stale_count": 0,
+        "stale": [],
+        "watchlist": [{"accession_no": "NL-000009", "value_est_cents": 9000}],
+        "delta": {},
+    }
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.get("/api/v1/watch/status").mock(
+            return_value=Response(200, json=payload)
+        )
+        result = await get_watchlist(n=5)
+        assert route.calls.last.request.url.params["n"] == "5"
+    parsed = json.loads(result)
+    assert isinstance(parsed, list)
+    assert parsed[0]["value_est_cents"] == 9000
+
+
+async def test_submit_digest_posts_items() -> None:
+    items = [{"series": "Morgan Dollar", "reason": "silver rally"}]
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.post("/api/v1/watch/digest").mock(
+            return_value=Response(
+                200, json={"items": [{"series": "Morgan Dollar", "matched": 3}],
+                           "total_marked": 3}
+            )
+        )
+        result = await submit_digest(items)
+        body = json.loads(route.calls.last.request.content)
+        assert body == {"items": items}
+    assert json.loads(result)["total_marked"] == 3
+
+
+async def test_submit_digest_unknown_series_relays_422() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.post("/api/v1/watch/digest").mock(
+            return_value=Response(
+                422,
+                json={"detail": {"message": "unknown series 'X'",
+                                 "known_series": ["Morgan Dollar"]}},
+            )
+        )
+        result = await submit_digest([{"series": "X", "reason": "y"}])
+    assert result.startswith("Error: API error 422:")
