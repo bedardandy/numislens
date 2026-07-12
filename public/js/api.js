@@ -137,6 +137,17 @@ export function locationTree() {
   return apiFetch('/api/v1/locations/tree');
 }
 
-export function getLocation(locationId) {
-  return apiFetch(`/api/v1/locations/${encodeURIComponent(locationId)}`);
+export function getLocation(locationId, recursive) {
+  const base = '/api/v1/locations/' + encodeURIComponent(locationId);
+  if (recursive === undefined) return apiFetch(base);
+  return apiFetch(base + '?recursive=' + (recursive ? 'true' : 'false'));
+}
+
+export function createLocation(kind, label, parentId) {
+  const body = { kind, label };
+  if (parentId != null) body.parent_id = parentId;
+  return apiFetch('/api/v1/locations', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }

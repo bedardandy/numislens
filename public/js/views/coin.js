@@ -8,8 +8,21 @@ import {
 import { toast } from '../app.js';
 import { navigate } from '../router.js';
 import { flattenLocationTree, populateLocationSelect } from '../tree.js';
+import { renderPhotoCapture } from '../photo.js';
 
 const EM_DASH = '\u2014';
+
+let activeObjectUrls = [];
+function revokeActiveObjectUrls() {
+  for (const u of activeObjectUrls) URL.revokeObjectURL(u);
+  activeObjectUrls = [];
+}
+let leakGuardInstalled = false;
+function installLeakGuard() {
+  if (leakGuardInstalled) return;
+  leakGuardInstalled = true;
+  window.addEventListener('hashchange', revokeActiveObjectUrls);
+}
 
 function display(value) {
   if (value == null || value === '') return EM_DASH;
@@ -63,6 +76,7 @@ async function loadImageStrip(container, accession, images) {
         `/api/v1/coins/${encodeURIComponent(accession)}/images/${img.content_hash}`,
       );
       const url = URL.createObjectURL(blob);
+      activeObjectUrls.push(url);
       const image = document.createElement('img');
       image.src = url;
       image.alt = img.kind ?? '';
@@ -85,6 +99,8 @@ async function loadImageStrip(container, accession, images) {
 
 export async function renderCoin(el, accession) {
   el.replaceChildren();
+  revokeActiveObjectUrls();
+  installLeakGuard();
 
   const loading = document.createElement('p');
   loading.textContent = 'Loading\u2026';
@@ -236,15 +252,25 @@ export async function renderCoin(el, accession) {
     }
   });
 
+  const photosPanel = document.createElement('div');
+  photosPanel.style.cssText = 'display:none;width:100%;margin-top:var(--space-md);';
+  let photosBuilt = false;
   const photosBtn = document.createElement('button');
   photosBtn.type = 'button';
   photosBtn.textContent = 'Add photos';
-  photosBtn.disabled = true;
-  photosBtn.title = 'Coming in Phase 3b';
+  photosBtn.addEventListener('click', () => {
+    if (photosPanel.style.display === 'none') {
+      if (!photosBuilt) { renderPhotoCapture(photosPanel, accession, {}); photosBuilt = true; }
+      photosPanel.style.display = 'block';
+    } else {
+      photosPanel.style.display = 'none';
+    }
+  });
 
   actions.appendChild(moveBtn);
   actions.appendChild(printBtn);
   actions.appendChild(photosBtn);
   actions.appendChild(movePicker);
+  actions.appendChild(photosPanel);
   el.appendChild(actions);
 }
