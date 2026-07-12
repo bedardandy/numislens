@@ -4,8 +4,23 @@ Numislens is a Progressive Web Application (PWA) that uses AI to identify and gr
 
 ## Repository layout
 
-- **`core/`** — the collection ledger: a dependency-free Python package (`numislens_core`) over a single SQLite database, plus its data (SQL migrations, the compositions seed, and set manifests in `core/sets/`). This is the source of truth for the whole platform. Run its tests with `cd core && python -m pytest`.
+- **`core/`** — the collection ledger: a dependency-free Python package (`numislens_core`) over a single SQLite database, plus its data (SQL migrations, the compositions seed, and set manifests in `core/sets/`). This is the source of truth for the whole platform. Run its tests with `cd core && python3 -m pytest`.
+- **`ops/`** — operational files: user-level systemd units for the daily melt update, plus Litestream and dump-based backup config. See `ops/README.md` and `ops/BACKUP.md`. Nothing here is installed or enabled automatically.
 - **`public/`** — the existing vanilla-JS PWA. It is slated for a thin rebuild against the core API in a later phase; treat it as legacy for now.
+
+### Core CLI quickstart
+
+The `core/` package installs a `numislens` console script (`pip install -e core`). The database resolves from `--db`, then `$NUMISLENS_DB`, then `~/.local/share/numislens/numislens.db`.
+
+```bash
+numislens init                                          # create/migrate the database
+numislens add --series "Peace Dollar" --year 1921 \
+  --mint P --composition 4 --value-basis melt           # returns an accession, e.g. NL-000001
+numislens melt update                                   # fetch dual-source spot, recompute melt values
+numislens melt status                                   # latest spots + portfolio melt + daily change
+```
+
+Melt fetching is keyless and fail-loud: it never fabricates a price and exits non-zero on source disagreement (>2%), staleness (>48h), or network errors. Read commands (`show`, `find`, `set gaps`, `set status`, `melt status`) accept `--json`.
 
 ## Features
 

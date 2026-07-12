@@ -1,0 +1,13 @@
+# Example Litestream configuration for continuous SQLite replication.
+# Copy to /etc/litestream.yml (system) or run: litestream replicate -config ops/litestream.yml
+# Replace ALL placeholders. Never commit real credentials.
+dbs:
+  - path: /home/REPLACE_USER/.local/share/numislens/numislens.db
+    replicas:
+      - type: s3
+        bucket: REPLACE_BUCKET_NAME
+        path: numislens
+        endpoint: REPLACE_S3_OR_B2_ENDPOINT   # e.g. s3.us-west-002.backblazeb2.com for Backblaze B2
+        region: REPLACE_REGION
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}

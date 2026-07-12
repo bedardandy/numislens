@@ -1,0 +1,12 @@
+[Unit]
+Description=Run NumisLens melt update daily
+Documentation=https://github.com/bedardandy/numislens
+
+[Timer]
+OnCalendar=*-*-* 13:00:00
+RandomizedDelaySec=1800
+Persistent=true
+Unit=numislens-melt.service
+
+[Install]
+WantedBy=timers.target
