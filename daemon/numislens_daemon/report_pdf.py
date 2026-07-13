@@ -153,6 +153,10 @@ def render_appraisal_pdf(report: dict) -> bytes:
             f"{_signed(totals['gain_loss_cents'])} "
             f"({_money(totals['paired_best_cents'])} vs {_money(totals['paired_cost_cents'])})",
         )
+    # Grand total folds in roll value; only shown when rolls contribute value.
+    if totals.get("roll_best_total_cents"):
+        _kv(pdf, "Roll best total", _money(totals["roll_best_total_cents"]))
+        _kv(pdf, "Grand total (coins + rolls)", _money(totals["grand_total_cents"]))
 
     # --- Breakdown ---------------------------------------------------------
     bd = report["breakdown"]
@@ -269,6 +273,34 @@ def render_appraisal_pdf(report: dict) -> bytes:
             aligns=["L", "R", "R", "R"],
         )
 
+    rolls_ = groups.get("rolls") or []
+    if rolls_:
+        _heading(pdf, "Rolls")
+        _table(
+            pdf,
+            ["Roll", "Denomination", "Count", "Status", "Basis", "Value"],
+            [
+                full * 0.18,
+                full * 0.27,
+                full * 0.11,
+                full * 0.16,
+                full * 0.12,
+                full * 0.16,
+            ],
+            [
+                [
+                    str(g["roll_no"]),
+                    str(g["denomination"]),
+                    str(g["count"]),
+                    str(g["status"]),
+                    str(g["basis"]),
+                    _money(g["value_cents"]),
+                ]
+                for g in rolls_
+            ],
+            aligns=["L", "L", "R", "L", "L", "R"],
+        )
+
     # --- Data-quality footer (only nonzero disclosures) --------------------
     dq = report.get("data_quality") or {}
     notes: list[str] = []
@@ -278,6 +310,8 @@ def render_appraisal_pdf(report: dict) -> bytes:
         notes.append(f"{dq['stale_count']} coin(s) with stale valuation")
     if dq.get("basis_unspecified_count"):
         notes.append(f"{dq['basis_unspecified_count']} estimate(s) with unspecified basis")
+    if dq.get("rolls_unvalued_count"):
+        notes.append(f"{dq['rolls_unvalued_count']} roll(s) unvalued (excluded from totals)")
     missing = dq.get("metals_missing_spot") or []
     if missing:
         notes.append("no primary spot for: " + ", ".join(missing))

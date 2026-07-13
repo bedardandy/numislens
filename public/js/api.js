@@ -196,3 +196,116 @@ export function getAppraisalReport(top = 10) {
 export function getAppraisalReportPdf(top = 10) {
   return fetchBlob(`/api/v1/report/appraisal.pdf?top=${encodeURIComponent(top)}`);
 }
+
+// ---------------------------------------------------------------------------
+// Rolls
+// ---------------------------------------------------------------------------
+
+export function listRolls(status) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiFetch(`/api/v1/rolls${qs}`);
+}
+
+export function getRoll(rollNo) {
+  return apiFetch(`/api/v1/rolls/${encodeURIComponent(rollNo)}`);
+}
+
+export function createRoll(body) {
+  return apiFetch('/api/v1/rolls', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateRoll(rollNo, body) {
+  return apiFetch(`/api/v1/rolls/${encodeURIComponent(rollNo)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export function pullRoll(rollNo, count, quick) {
+  const body = { count };
+  if (quick != null) body.quick = quick;
+  return apiFetch(`/api/v1/rolls/${encodeURIComponent(rollNo)}/pull`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function getRollLabelsPdf(rollNos) {
+  const qs = new URLSearchParams();
+  for (const rollNo of rollNos || []) qs.append('rolls', rollNo);
+  const query = qs.toString();
+  return fetchBlob(`/api/v1/labels/rolls.pdf${query ? `?${query}` : ''}`);
+}
+
+// ---------------------------------------------------------------------------
+// Album imports
+// ---------------------------------------------------------------------------
+
+export function listAlbumImports() {
+  return apiFetch('/api/v1/albums/imports');
+}
+
+export function getAlbumImport(importId) {
+  return apiFetch(`/api/v1/albums/imports/${encodeURIComponent(importId)}`);
+}
+
+export function createAlbumImport(name) {
+  const body = {};
+  if (name) body.name = name;
+  return apiFetch('/api/v1/albums/imports', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function discardAlbumImport(importId) {
+  return apiFetch(`/api/v1/albums/imports/${encodeURIComponent(importId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function uploadAlbumPages(importId, files) {
+  const fd = new FormData();
+  for (const file of files) fd.append('pages', file, file.name || 'page.jpg');
+  return apiUpload(`/api/v1/albums/imports/${encodeURIComponent(importId)}/pages`, fd);
+}
+
+export function getAlbumPageImageUrl(importId, pageId) {
+  return `/api/v1/albums/imports/${encodeURIComponent(importId)}/pages/${encodeURIComponent(pageId)}/image`;
+}
+
+export function fetchAlbumPageImage(importId, pageId) {
+  return fetchBlob(getAlbumPageImageUrl(importId, pageId));
+}
+
+export function patchAlbumSlot(importId, slotId, fillState) {
+  return apiFetch(
+    `/api/v1/albums/imports/${encodeURIComponent(importId)}/slots/${encodeURIComponent(slotId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ fill_state: fillState }),
+    },
+  );
+}
+
+export function commitAlbumImport(importId, body) {
+  return apiFetch(`/api/v1/albums/imports/${encodeURIComponent(importId)}/commit`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Set needs / want lists
+// ---------------------------------------------------------------------------
+
+export function getSetNeeds(setId) {
+  return apiFetch(`/api/v1/sets/${encodeURIComponent(setId)}/needs`);
+}
+
+export function getWantlistPdf(setId) {
+  return fetchBlob(`/api/v1/sets/${encodeURIComponent(setId)}/wantlist.pdf`);
+}

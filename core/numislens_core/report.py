@@ -100,9 +100,34 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
         ).fetchall()
     }
 
-    # Spot rows only for metals that actually appear among owned coins, and only
-    # those with a PRIMARY-source row. Metals present but unpriced are disclosed.
-    owned_metals = sorted({row["metal"] for row in coins if row["metal"] is not None})
+    # Rolls (bulk holdings): value non-exhausted rolls that still hold coins.
+    # Loaded here so their composition metals join the spot lookup below.
+    roll_rows = conn.execute(
+        """
+        SELECT
+            r.roll_no AS roll_no,
+            r.denomination AS denomination,
+            r.country AS country,
+            r.count AS count,
+            r.series AS series,
+            r.status AS status,
+            r.composition_id AS composition_id,
+            comp.metal AS metal,
+            comp.precious_weight_ozt AS ozt
+        FROM rolls r
+        LEFT JOIN compositions comp ON r.composition_id = comp.id
+        WHERE r.status != 'exhausted' AND r.count > 0
+        ORDER BY r.roll_no
+        """
+    ).fetchall()
+
+    # Spot rows only for metals that actually appear among owned coins (and
+    # rolls), and only those with a PRIMARY-source row. Metals present but
+    # unpriced are disclosed.
+    owned_metals = sorted(
+        {row["metal"] for row in coins if row["metal"] is not None}
+        | {row["metal"] for row in roll_rows if row["metal"] is not None}
+    )
     spot: dict[str, dict] = {}
     spot_cents_by_metal: dict[str, int] = {}
     metals_missing_spot: list[str] = []
@@ -256,6 +281,40 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
                 }
             )
 
+    # --- Rolls: value each non-exhausted roll with the shared spot map. A roll
+    # with no valuation basis is disclosed by count only (data_quality), never
+    # given a made-up figure -- the same NO-FABRICATION rule coins follow.
+    from .rolls import roll_valuation  # local import avoids a module import cycle
+
+    roll_count = len(roll_rows)
+    roll_face_total = 0
+    roll_melt_total = 0
+    roll_best_total = 0
+    rolls_unvalued_count = 0
+    rolls_valued: list[dict] = []
+    for r in roll_rows:
+        rv = roll_valuation(conn, r, spot_cents_by_metal)
+        if rv["face_cents"] is not None:
+            roll_face_total += rv["face_cents"]
+        if rv["melt_cents"] is not None:
+            roll_melt_total += rv["melt_cents"]
+        if rv["best_cents"] is None:
+            rolls_unvalued_count += 1
+            continue
+        roll_best_total += rv["best_cents"]
+        rolls_valued.append(
+            {
+                "roll_no": r["roll_no"],
+                "denomination": r["denomination"],
+                "series": r["series"],
+                "count": r["count"],
+                "status": r["status"],
+                "basis": rv["basis"],
+                "value_cents": rv["best_cents"],
+            }
+        )
+    rolls_valued.sort(key=lambda g: (-g["value_cents"], g["roll_no"]))
+
     # Highlights: top_n by best_cents DESC, tie-break accession_no ASC.
     highlights = sorted(
         valued_rows, key=lambda r: (-r["best_cents"], r["accession_no"])
@@ -337,6 +396,11 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
             "paired_cost_cents": paired_cost,
             "paired_best_cents": paired_best,
             "gain_loss_cents": paired_best - paired_cost,
+            "roll_count": roll_count,
+            "roll_face_total_cents": roll_face_total,
+            "roll_melt_total_cents": roll_melt_total,
+            "roll_best_total_cents": roll_best_total,
+            "grand_total_cents": best_total + roll_best_total,
         },
         "breakdown": {
             "collectible": bucket["collectible"],
@@ -350,6 +414,7 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
             "mints": mints_out,
             "series": series_out,
             "metals": metals_out,
+            "rolls": rolls_valued,
         },
         "data_quality": {
             "unvalued_count": unvalued_count,
@@ -357,5 +422,6 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
             "no_composition_count": no_composition_count,
             "basis_unspecified_count": basis_unspecified_count,
             "metals_missing_spot": metals_missing_spot,
+            "rolls_unvalued_count": rolls_unvalued_count,
         },
     }

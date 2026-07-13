@@ -13,7 +13,14 @@ import {
   mintRowCells,
   seriesRowCells,
   metalRowCells,
+  rollRowCells,
+  rollTotalsLine,
 } from '../../public/js/views/report.js';
+import {
+  formatCompletion,
+  keyDateMarker,
+  missingSlotLabel,
+} from '../../public/js/views/sets.js';
 
 const EM_DASH = '—';
 
@@ -114,4 +121,53 @@ test('metalRowCells shapes a metal group row', () => {
     metalRowCells({ metal: 'XAG', count: 20, melt_cents: 45000, value_cents: 60000 }),
     ['Silver', '20', '$450.00', '$600.00']
   );
+});
+
+test('rollRowCells shapes a roll group row', () => {
+  assert.deepEqual(
+    rollRowCells({
+      roll_no: 'NR-000001',
+      denomination: 'cent',
+      count: 50,
+      status: 'unopened',
+      basis: 'melt',
+      value_cents: 12345,
+    }),
+    ['NR-000001', 'cent', '50', 'unopened', 'Melt', '$123.45']
+  );
+});
+
+test('rollTotalsLine summarizes face/melt/best roll totals', () => {
+  assert.equal(
+    rollTotalsLine({
+      roll_face_total_cents: 5000,
+      roll_melt_total_cents: 12000,
+      roll_best_total_cents: 12000,
+    }),
+    'Face $50.00 · Melt $120.00 · Best $120.00'
+  );
+});
+
+test('formatCompletion shapes filled/total (pct%) computing pct when omitted', () => {
+  assert.equal(formatCompletion(12, 77), '12/77 (15.6%)');
+  assert.equal(formatCompletion(0, 50), '0/50 (0%)');
+  assert.equal(formatCompletion(50, 50), '50/50 (100%)');
+  assert.equal(formatCompletion(0, 0), '0/0 (0%)');
+  assert.equal(formatCompletion(null, null), '0/0 (0%)');
+});
+
+test('formatCompletion uses a supplied pct verbatim (matches /needs completion_pct)', () => {
+  assert.equal(formatCompletion(12, 77, 15.6), '12/77 (15.6%)');
+});
+
+test('keyDateMarker stars only key-date missing slots', () => {
+  assert.equal(keyDateMarker({ key_date: true }), '★');
+  assert.equal(keyDateMarker({ key_date: false }), '');
+  assert.equal(keyDateMarker(null), '');
+});
+
+test('missingSlotLabel formats year-mint with an optional note', () => {
+  assert.equal(missingSlotLabel({ year: 1932, mint: 'D', note: '' }), '1932-D');
+  assert.equal(missingSlotLabel({ year: 1932, mint: 'D', note: 'doubled die' }), '1932-D doubled die');
+  assert.equal(missingSlotLabel(null), '—');
 });

@@ -7,11 +7,12 @@ import os
 import tempfile
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
-from numislens_core import Ledger, validate_manifest
+from fastapi import APIRouter, Depends, HTTPException, Response
+from numislens_core import Ledger, albums, validate_manifest
 
 from ..deps import get_ledger
 from ..schemas import AssignBody, SetLoad
+from ..wantlist_pdf import render_wantlist_pdf
 
 router = APIRouter()
 
@@ -77,6 +78,26 @@ def set_status(set_id: str, ldb: LedgerDep) -> dict:
 def set_board(set_id: str, ldb: LedgerDep) -> dict:
     sid = _parse_set_id(set_id)
     return ldb.set_board(sid)
+
+
+@router.get("/sets/{set_id}/needs", tags=["sets"])
+def set_needs(set_id: str, ldb: LedgerDep) -> dict:
+    sid = _parse_set_id(set_id)
+    return albums.needs(ldb.conn, sid)
+
+
+@router.get("/sets/{set_id}/wantlist.pdf", tags=["sets"])
+def set_wantlist_pdf(set_id: str, ldb: LedgerDep) -> Response:
+    sid = _parse_set_id(set_id)
+    needs = albums.needs(ldb.conn, sid)
+    pdf_bytes = render_wantlist_pdf(needs)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="wantlist-{needs["set_key"]}.pdf"',
+        },
+    )
 
 
 @router.post("/sets/{set_id}/assign", tags=["sets"])

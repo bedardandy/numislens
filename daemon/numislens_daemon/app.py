@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .auth import require_token
 from .config import Settings, resolve_token
 from .errors import register_error_handlers
-from .routers import coins, labels, locations, melt, report, sets, watch
+from .routers import albums, coins, labels, locations, melt, report, rolls, sets, watch
 
 
 def create_app(
@@ -53,6 +53,8 @@ def create_app(
     router.include_router(labels.router)
     router.include_router(report.router)
     router.include_router(watch.router)
+    router.include_router(rolls.router)
+    router.include_router(albums.router)
 
     app.include_router(router)
     register_error_handlers(app)
@@ -65,6 +67,11 @@ def create_app(
     # #/coin/<accession>. Registered before the "/" mount so it wins.
     @app.get("/c/{accession}", include_in_schema=False)
     def deep_link(accession: str) -> FileResponse:
+        return FileResponse(public / "index.html")
+
+    # Roll labels encode /r/<roll_no>; same SPA-shell trick as /c/ above.
+    @app.get("/r/{roll_no}", include_in_schema=False)
+    def roll_deep_link(roll_no: str) -> FileResponse:
         return FileResponse(public / "index.html")
 
     app.mount("/", StaticFiles(directory=public, html=True), name="static")

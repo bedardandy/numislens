@@ -6,11 +6,11 @@ from typing import Annotated, Optional
 
 import os
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from numislens_core import Ledger
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from numislens_core import Ledger, rolls
 
 from ..deps import get_ledger
-from ..labels import render_labels
+from ..labels import render_labels, render_roll_labels
 
 router = APIRouter()
 
@@ -51,5 +51,38 @@ def labels_pdf(
         media_type="application/pdf",
         headers={
             "Content-Disposition": 'inline; filename="numislens-labels.pdf"',
+        },
+    )
+
+
+@router.get("/labels/rolls.pdf", tags=["labels"])
+def roll_labels_pdf(
+    request: Request,
+    ldb: LedgerDep,
+    rolls_param: Optional[list[str]] = Query(default=None, alias="rolls"),
+) -> Response:
+    """Avery 5160 sheet of roll labels. ``?rolls=NR-...&rolls=...`` (repeatable)
+    selects specific rolls; omitted selects every non-exhausted roll."""
+    if rolls_param:
+        selected = []
+        for roll_no in rolls_param:
+            roll = rolls.get_roll(ldb.conn, roll_no)
+            if roll is None:
+                raise HTTPException(404, f"roll not found: {roll_no}")
+            selected.append(roll)
+    else:
+        selected = [
+            r
+            for r in rolls.list_rolls(ldb.conn)
+            if r["status"] != "exhausted"
+        ]
+
+    base_url = os.environ.get("NUMISLENS_PUBLIC_URL") or str(request.base_url)
+    pdf_bytes = render_roll_labels(selected, base_url=base_url)
+    return Response(
+        content=bytes(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'inline; filename="numislens-roll-labels.pdf"',
         },
     )

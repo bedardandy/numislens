@@ -633,6 +633,19 @@ input::placeholder {
 
 .slot-chip--key { border-width: 2px; box-shadow: inset 0 0 0 1px var(--color-accent); }
 
+.slot-chip--uncertain {
+  background: rgba(212, 160, 23, 0.12);
+  border-color: #d4a017;
+  color: var(--color-text);
+}
+
+button.slot-chip {
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+}
+
 .slot-chip-yearmint { font-weight: 600; }
 
 .slot-key-marker {
@@ -885,3 +898,30 @@ input::placeholder {
 }
 
 #cyclecount-summary button { margin-top: var(--space-sm); align-self: flex-start; }
+
+/* ── Rolls + report basis/status badges ────────────────────── */
+
+.status-chip {
+  display: inline-block;
+  padding: 2px var(--space-sm);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.status-chip--unopened { color: var(--color-accent); border-color: var(--color-accent); }
+.status-chip--searching { color: #b26a00; border-color: #b26a00; }
+.status-chip--searched { color: var(--color-success); border-color: var(--color-success); }
+.status-chip--exhausted { color: var(--color-text-muted); }
+
+.report-basis-badge {
+  display: inline-block;
+  padding: 1px var(--space-xs);
+  font-size: 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}

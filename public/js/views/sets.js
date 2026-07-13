@@ -1,4 +1,4 @@
-import { listSets, getSetBoard, listCoins, assignToSet } from '../api.js';
+import { listSets, getSetBoard, listCoins, assignToSet, getSetNeeds, getWantlistPdf } from '../api.js';
 import { toast } from '../app.js';
 import { navigate } from '../router.js';
 import { cacheSnapshot, readSnapshot, offlineBanner, isNetworkError } from '../offline.js';
@@ -12,6 +12,35 @@ function display(value) {
 
 function yearMint(year, mint) {
   return String(year) + '-' + String(mint);
+}
+
+// ---------------------------------------------------------------------------
+// Pure helpers (exported for testing).
+// ---------------------------------------------------------------------------
+
+/**
+ * "filled/total (pct%)" completion caption. Computes the percentage (one
+ * decimal) from filled/total when ``pct`` is not supplied, matching how the
+ * ``/sets/{id}/needs`` endpoint rounds ``completion_pct``.
+ */
+export function formatCompletion(filled, total, pct) {
+  const f = filled != null ? filled : 0;
+  const t = total != null ? total : 0;
+  const p = pct != null ? pct : t > 0 ? Math.round((1000 * f) / t) / 10 : 0;
+  return `${f}/${t} (${p}%)`;
+}
+
+/** Star marker for a key-date missing slot, else empty string. */
+export function keyDateMarker(missingItem) {
+  return missingItem && missingItem.key_date ? '\u2605' : '';
+}
+
+/** "1921-D \u2014 MS64" style label for a missing slot (note omitted when blank). */
+export function missingSlotLabel(missingItem) {
+  if (missingItem == null) return EM_DASH;
+  const base = yearMint(missingItem.year, missingItem.mint);
+  const note = missingItem.note ? ` ${missingItem.note}` : '';
+  return `${base}${note}`;
 }
 
 export async function renderSets(el) {
@@ -91,7 +120,7 @@ export async function renderSets(el) {
 
     const caption = document.createElement('div');
     caption.className = 'completion-caption';
-    caption.textContent = filled + ' / ' + total + ' slots';
+    caption.textContent = formatCompletion(filled, total);
     li.appendChild(caption);
 
     list.appendChild(li);
@@ -202,8 +231,91 @@ export async function renderSetBoard(el, setId) {
 
   const boardCaption = document.createElement('div');
   boardCaption.className = 'completion-caption';
-  boardCaption.textContent = boardFilled + ' / ' + boardTotal + ' slots';
+  boardCaption.textContent = formatCompletion(boardFilled, boardTotal);
   el.appendChild(boardCaption);
+
+  const needsActions = document.createElement('div');
+  needsActions.className = 'settings-actions';
+
+  const needsToggle = document.createElement('button');
+  needsToggle.type = 'button';
+  needsToggle.textContent = 'Needs';
+  needsActions.appendChild(needsToggle);
+
+  const wantlistBtn = document.createElement('button');
+  wantlistBtn.type = 'button';
+  wantlistBtn.textContent = 'Want list PDF';
+  wantlistBtn.addEventListener('click', async () => {
+    wantlistBtn.disabled = true;
+    try {
+      const blob = await getWantlistPdf(setId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `wantlist-${setId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Want list downloaded', 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      wantlistBtn.disabled = false;
+    }
+  });
+  needsActions.appendChild(wantlistBtn);
+  el.appendChild(needsActions);
+
+  const needsPanel = document.createElement('div');
+  needsPanel.hidden = true;
+  el.appendChild(needsPanel);
+
+  needsToggle.addEventListener('click', async () => {
+    if (!needsPanel.hidden) {
+      needsPanel.hidden = true;
+      return;
+    }
+    needsPanel.hidden = false;
+    needsPanel.replaceChildren();
+    const loadingP = document.createElement('p');
+    loadingP.textContent = 'Loading needs…';
+    needsPanel.appendChild(loadingP);
+    try {
+      const needs = await getSetNeeds(setId);
+      needsPanel.replaceChildren();
+      const summary = document.createElement('p');
+      summary.className = 'muted';
+      summary.textContent =
+        `${formatCompletion(needs.filled, needs.total_slots, needs.completion_pct)} — ` +
+        `${needs.key_dates_missing} key date${needs.key_dates_missing === 1 ? '' : 's'} missing`;
+      needsPanel.appendChild(summary);
+
+      if (!needs.missing.length) {
+        const doneP = document.createElement('p');
+        doneP.textContent = 'Nothing missing — set is complete.';
+        needsPanel.appendChild(doneP);
+      } else {
+        const missingList = document.createElement('ul');
+        missingList.className = 'count-list';
+        for (const item of needs.missing) {
+          const li = document.createElement('li');
+          li.className = 'count-item';
+          const label = document.createElement('div');
+          const star = keyDateMarker(item);
+          label.textContent = missingSlotLabel(item) + (star ? ' ' + star : '');
+          li.appendChild(label);
+          missingList.appendChild(li);
+        }
+        needsPanel.appendChild(missingList);
+      }
+    } catch (err) {
+      needsPanel.replaceChildren();
+      const errDiv = document.createElement('div');
+      errDiv.className = 'empty-state';
+      errDiv.textContent = err.message;
+      needsPanel.appendChild(errDiv);
+      toast(err.message, 'error');
+    }
+  });
 
   const grid = document.createElement('div');
   grid.className = 'album-grid';

@@ -90,8 +90,11 @@ def test_report_json_shape_seeded(client, auth_headers, patch_spot) -> None:
     assert body["highlights"][0]["best_basis"] == "collectible"
     assert body["highlights"][0]["best_cents"] == 500000
 
-    # groups present, spot provenance present (primary-source XAG).
-    assert set(body["groups"]) == {"sets", "mints", "series", "metals"}
+    # groups present, spot provenance present (primary-source XAG). Subset (not
+    # ==) so additive group keys (rolls, albums, ...) from concurrent
+    # workstreams don't fight over an exact key-set assertion.
+    assert {"sets", "mints", "series", "metals"} <= set(body["groups"])
+    assert "rolls" in body["groups"]
     assert "XAG" in body["spot"]
     assert body["spot"]["XAG"]["source"] == "gold-api"
 

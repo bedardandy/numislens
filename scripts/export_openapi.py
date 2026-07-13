@@ -38,9 +38,12 @@ SERVER_URL = "https://numislens.YOUR-TAILNET-NAME.ts.net"
 # GET /api/v1/watch/status and POST /api/v1/watch/digest (24); Phase 4 adds the
 # vision writeback PATCH /api/v1/coins/{accession} (same template as GET, so it
 # is not a new path) — the new path count comes from... nothing: PATCH reuses
-# the existing /api/v1/coins/{accession} template. Count stays 24. Assert the
-# real number so an accidental route drop/add is caught at export time.
-EXPECTED_PATH_COUNT = 24
+# the existing /api/v1/coins/{accession} template. Count stays 24. Coin rolls +
+# album photo import added 7 roll paths, 7 album paths, and
+# GET /api/v1/sets/{set_id}/needs + GET /api/v1/sets/{set_id}/wantlist.pdf +
+# GET /api/v1/labels/rolls.pdf (39 total). Assert the real number so an
+# accidental route drop/add is caught at export time.
+EXPECTED_PATH_COUNT = 39
 
 
 def build_spec() -> dict:

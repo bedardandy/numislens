@@ -9,6 +9,8 @@ import { renderSets, renderSetBoard } from './views/sets.js';
 import { renderMelt } from './views/melt.js';
 import { renderReport } from './views/report.js';
 import { renderCycleCount } from './views/cyclecount.js';
+import { renderRolls, renderRollDetail } from './views/rolls.js';
+import { renderAlbums, renderAlbumDetail } from './views/albums.js';
 import { replayMoveQueue, queuedMoveCount } from './offline.js';
 
 const TOAST_DURATIONS = { error: 8000, info: 4000, success: 4000 };
@@ -76,6 +78,8 @@ async function runReplay() {
 const NAV_ITEMS = [
   { id: 'inventory', label: 'Inventory', hash: '#/', route: 'inventory', group: 'primary' },
   { id: 'add', label: 'Add', hash: '#/add', route: 'add', group: 'primary' },
+  { id: 'rolls', label: 'Rolls', hash: '#/rolls', route: 'rolls', group: 'more' },
+  { id: 'albums', label: 'Albums', hash: '#/albums', route: 'albums', group: 'more' },
   { id: 'sets', label: 'Sets', hash: '#/sets', route: 'sets', group: 'more' },
   { id: 'melt', label: 'Melt', hash: '#/melt', route: 'melt', group: 'more' },
   { id: 'report', label: 'Report', hash: '#/report', route: 'report', group: 'more' },
@@ -188,7 +192,12 @@ function buildShell() {
 
 function setActiveNav(routeName) {
   const activeRoute =
-    routeName === 'coin' ? 'inventory' : routeName === 'setboard' ? 'sets' : routeName === 'count' ? 'locations' : routeName;
+    routeName === 'coin' ? 'inventory'
+    : routeName === 'setboard' ? 'sets'
+    : routeName === 'count' ? 'locations'
+    : routeName === 'roll' ? 'rolls'
+    : routeName === 'album' ? 'albums'
+    : routeName;
   for (const item of NAV_ITEMS) {
     if (!item.route) continue;
     const el = document.getElementById(`nav-${item.id}`);
@@ -271,6 +280,18 @@ function onRoute(route) {
       break;
     case 'count':
       renderCycleCount(viewEl, route.params.locationId);
+      break;
+    case 'rolls':
+      renderRolls(viewEl);
+      break;
+    case 'roll':
+      renderRollDetail(viewEl, route.params.rollNo);
+      break;
+    case 'albums':
+      renderAlbums(viewEl);
+      break;
+    case 'album':
+      renderAlbumDetail(viewEl, route.params.importId);
       break;
     default:
       renderInventory(viewEl);

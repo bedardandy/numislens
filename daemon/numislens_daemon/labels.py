@@ -38,6 +38,14 @@ def _coin_label_lines(coin: dict) -> tuple[str, str]:
     return line1, line2
 
 
+def _roll_label_lines(roll: dict) -> tuple[str, str]:
+    line1 = roll["roll_no"]
+    line2 = f"{roll['denomination']} x{roll['count']}"
+    if roll.get("variant"):
+        line2 += " " + str(roll["variant"])
+    return line1, line2
+
+
 def _qr_png_bytes(data: str) -> io.BytesIO:
     qr = segno.make(data, error="m")
     buff = io.BytesIO()
@@ -75,6 +83,48 @@ def render_labels(coins: list[dict], base_url: str | None = None) -> bytes:
         pdf.image(png, x=x + 0.08, y=y + 0.075, w=qr_size, h=qr_size)
 
         line1, line2 = _coin_label_lines(coin)
+        text_x = x + qr_size + 0.18
+        pdf.set_xy(text_x, y + 0.2)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(LABEL_W - qr_size - 0.25, 0.2, line1)
+        pdf.set_xy(text_x, y + 0.45)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.multi_cell(LABEL_W - qr_size - 0.25, 0.16, line2)
+
+    return bytes(pdf.output())
+
+
+def render_roll_labels(rolls: list[dict], base_url: str | None = None) -> bytes:
+    """Avery 5160 sheet for coin rolls. QR encodes ``{base}/r/<roll_no>``.
+
+    Mirrors :func:`render_labels`'s geometry; only the QR deep-link path (/r/
+    vs /c/) and the two text lines (roll_no; '<denomination> x<count>' + variant)
+    differ.
+    """
+    qr_base = (base_url.rstrip("/") if base_url else QR_FALLBACK_BASE.rstrip("/")) + "/r/"
+    pdf = FPDF(orientation="P", unit="in", format="Letter")
+    pdf.set_auto_page_break(False)
+    pdf.set_margins(0, 0, 0)
+
+    if not rolls:
+        pdf.add_page()
+        return bytes(pdf.output())
+
+    for index, roll in enumerate(rolls):
+        if index % 30 == 0:
+            pdf.add_page()
+
+        pos = index % 30
+        row = pos // COLS
+        col = pos % COLS
+        x = MARGIN_LEFT + col * COL_PITCH
+        y = MARGIN_TOP + row * ROW_PITCH
+
+        png = _qr_png_bytes(qr_base + roll["roll_no"])
+        qr_size = 0.85
+        pdf.image(png, x=x + 0.08, y=y + 0.075, w=qr_size, h=qr_size)
+
+        line1, line2 = _roll_label_lines(roll)
         text_x = x + qr_size + 0.18
         pdf.set_xy(text_x, y + 0.2)
         pdf.set_font("Helvetica", "B", 9)

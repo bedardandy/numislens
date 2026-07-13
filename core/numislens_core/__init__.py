@@ -12,7 +12,32 @@ from .ledger import (
     UnknownSeries,
 )
 from .manifests import ManifestError, load_manifest, validate_manifest
+from .albums import (
+    AlbumError,
+    AlbumNotFound,
+    AlbumUncertain,
+    commit_import,
+    extract_century_hint,
+    load_manifests,
+    match_manifests,
+    merge_page_slots,
+    needs,
+    parse_slot_label,
+)
 from .report import build_appraisal_report, face_value_cents
+from .rolls import (
+    ROLL_STATUSES,
+    STANDARD_ROLL_COUNTS,
+    RollError,
+    RollNotFound,
+    create_roll,
+    get_roll,
+    list_rolls,
+    next_roll_no,
+    pull_from_roll,
+    roll_valuation,
+    update_roll,
+)
 
 __version__ = "0.1.0"
 __all__ = [
@@ -31,6 +56,27 @@ __all__ = [
     "load_manifest",
     "validate_manifest",
     "ManifestError",
+    "AlbumError",
+    "AlbumNotFound",
+    "AlbumUncertain",
+    "parse_slot_label",
+    "extract_century_hint",
+    "merge_page_slots",
+    "match_manifests",
+    "load_manifests",
+    "commit_import",
+    "needs",
     "build_appraisal_report",
     "face_value_cents",
+    "ROLL_STATUSES",
+    "STANDARD_ROLL_COUNTS",
+    "RollError",
+    "RollNotFound",
+    "create_roll",
+    "get_roll",
+    "list_rolls",
+    "next_roll_no",
+    "pull_from_roll",
+    "roll_valuation",
+    "update_roll",
 ]

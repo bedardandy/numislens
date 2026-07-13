@@ -93,6 +93,26 @@ export function metalRowCells(m) {
   return [metalName(m.metal), display(m.count), formatCents(m.melt_cents), formatCents(m.value_cents)];
 }
 
+export function rollRowCells(r) {
+  return [
+    display(r.roll_no),
+    display(r.denomination),
+    display(r.count),
+    display(r.status),
+    basisLabel(r.basis),
+    formatCents(r.value_cents),
+  ];
+}
+
+/** "Face $X · Melt $Y · Best $Z" summary line for the rolls totals. */
+export function rollTotalsLine(totals) {
+  return (
+    `Face ${formatCents(totals.roll_face_total_cents)} ${MIDDOT} ` +
+    `Melt ${formatCents(totals.roll_melt_total_cents)} ${MIDDOT} ` +
+    `Best ${formatCents(totals.roll_best_total_cents)}`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // DOM building
 // ---------------------------------------------------------------------------
@@ -290,6 +310,11 @@ function buildFooter(report) {
   if (Array.isArray(dq.metals_missing_spot) && dq.metals_missing_spot.length) {
     notes.push(`No spot price for ${dq.metals_missing_spot.map(metalName).join(', ')}`);
   }
+  if (dq.rolls_unvalued_count) {
+    notes.push(
+      `${dq.rolls_unvalued_count} roll${dq.rolls_unvalued_count === 1 ? '' : 's'} have no basis for a value — not included in roll totals`,
+    );
+  }
   for (const note of notes) {
     const p = document.createElement('p');
     p.className = 'muted';
@@ -421,6 +446,27 @@ export async function renderReport(el) {
     ];
     for (const section of groupSections) {
       if (section) content.appendChild(section);
+    }
+
+    // --- Rolls --------------------------------------------------------------
+    if (totals.roll_count > 0) {
+      const rollsSection = makeGroupSection(
+        'Rolls',
+        ['Roll', 'Denomination', 'Count', 'Status', 'Basis', 'Value'],
+        groups.rolls,
+        rollRowCells,
+      );
+      if (rollsSection) content.appendChild(rollsSection);
+
+      const rollTotalsP = document.createElement('p');
+      rollTotalsP.className = 'muted';
+      rollTotalsP.textContent = rollTotalsLine(totals);
+      content.appendChild(rollTotalsP);
+
+      const grandTotalDiv = document.createElement('div');
+      grandTotalDiv.className = 'melt-total';
+      grandTotalDiv.textContent = `GRAND TOTAL ${formatCents(totals.grand_total_cents)}`;
+      content.appendChild(grandTotalDiv);
     }
 
     // --- Provenance footer ------------------------------------------------

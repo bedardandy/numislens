@@ -10,9 +10,13 @@ from numislens_mcp.config import load_config
 from numislens_mcp.server import (
     add_coin,
     add_location,
+    album_import_status,
+    albums_list,
     find_coins,
     get_coin,
     get_label_pdf,
+    get_roll_labels_pdf,
+    get_wantlist_pdf,
     get_watchlist,
     list_stale,
     locate_coin,
@@ -20,7 +24,12 @@ from numislens_mcp.server import (
     melt_update,
     move_coin,
     quick_add,
+    roll_create,
+    roll_get,
+    roll_pull,
+    rolls_list,
     set_gaps,
+    set_needs,
     submit_digest,
     watch_status,
 )
@@ -369,3 +378,210 @@ async def test_identify_coin_reports_error(monkeypatch) -> None:
     monkeypatch.setattr(pipeline, "identify", boom)
     out = identify_coin("NL-000001")
     assert out.startswith("Error: cannot reach the NumisLens daemon")
+
+
+# ---------------------------------------------------------------------------
+# Rolls
+# ---------------------------------------------------------------------------
+
+async def test_rolls_list_passes_status() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.get("/api/v1/rolls").mock(
+            return_value=Response(200, json=[{"roll_no": "NR-000001", "status": "unopened"}])
+        )
+        out = await rolls_list(status="unopened")
+        assert route.called
+        assert route.calls.last.request.url.params["status"] == "unopened"
+    assert json.loads(out)[0]["roll_no"] == "NR-000001"
+
+
+async def test_rolls_list_no_status_omits_param() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.get("/api/v1/rolls").mock(return_value=Response(200, json=[]))
+        await rolls_list()
+        assert "status" not in route.calls.last.request.url.params
+
+
+async def test_roll_get_roundtrip() -> None:
+    roll = {"roll_no": "NR-000001", "denomination": "cent", "count": 50, "best_cents": 5000}
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.get("/api/v1/rolls/NR-000001").mock(return_value=Response(200, json=roll))
+        result = await roll_get("NR-000001")
+    assert json.loads(result)["best_cents"] == 5000
+
+
+async def test_roll_get_404_message() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.get("/api/v1/rolls/NR-999999").mock(
+            return_value=Response(404, json={"detail": "roll not found: NR-999999"})
+        )
+        result = await roll_get("NR-999999")
+    assert result == "Error: API error 404: roll not found: NR-999999"
+
+
+async def test_roll_create_sends_body() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.post("/api/v1/rolls").mock(
+            return_value=Response(201, json={"roll_no": "NR-000001"})
+        )
+        await roll_create(
+            denomination="cent",
+            count=50,
+            composition_name="Copper (95%)",
+            cost_basis_cents=500,
+        )
+        body = json.loads(route.calls.last.request.content)
+        assert body == {
+            "denomination": "cent",
+            "count": 50,
+            "composition_name": "Copper (95%)",
+            "cost_basis_cents": 500,
+        }
+
+
+async def test_roll_create_422_relays_detail() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.post("/api/v1/rolls").mock(
+            return_value=Response(422, json={"detail": "unknown composition: 'x'"})
+        )
+        result = await roll_create(denomination="cent", count=50, composition_name="x")
+    assert result == "Error: API error 422: unknown composition: 'x'"
+
+
+async def test_roll_pull_sends_count_and_quick() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.post("/api/v1/rolls/NR-000001/pull").mock(
+            return_value=Response(
+                200,
+                json={
+                    "roll": {"roll_no": "NR-000001", "count": 48},
+                    "coins_created": ["NL-000010", "NL-000011"],
+                },
+            )
+        )
+        result = await roll_pull("NR-000001", 2, quick=["1943 steel cent", "1955 D cent"])
+        body = json.loads(route.calls.last.request.content)
+        assert body == {"count": 2, "quick": ["1943 steel cent", "1955 D cent"]}
+    parsed = json.loads(result)
+    assert parsed["coins_created"] == ["NL-000010", "NL-000011"]
+
+
+async def test_roll_pull_without_quick_omits_key() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.post("/api/v1/rolls/NR-000001/pull").mock(
+            return_value=Response(
+                200, json={"roll": {"roll_no": "NR-000001"}, "coins_created": []}
+            )
+        )
+        await roll_pull("NR-000001", 3)
+        body = json.loads(route.calls.last.request.content)
+        assert body == {"count": 3}
+
+
+async def test_roll_pull_422_relays_unparseable_detail() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.post("/api/v1/rolls/NR-000001/pull").mock(
+            return_value=Response(
+                422,
+                json={"detail": {"message": "could not identify a coin from quick text"}},
+            )
+        )
+        result = await roll_pull("NR-000001", 1, quick=["asdf qwerty"])
+    assert result.startswith("Error: API error 422:")
+
+
+async def test_get_roll_labels_pdf_writes_file(tmp_path) -> None:
+    pdf_bytes = b"%PDF-1.4 roll labels"
+    out_file = tmp_path / "roll-labels.pdf"
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.get("/api/v1/labels/rolls.pdf").mock(
+            return_value=Response(200, content=pdf_bytes)
+        )
+        result = await get_roll_labels_pdf(output_path=str(out_file), roll_nos=["NR-000001"])
+        assert route.calls.last.request.url.params.get_list("rolls") == ["NR-000001"]
+    assert out_file.exists()
+    assert out_file.read_bytes() == pdf_bytes
+    assert result.startswith("Saved roll label PDF to")
+
+
+async def test_get_roll_labels_pdf_no_selection_omits_param(tmp_path) -> None:
+    out_file = tmp_path / "roll-labels.pdf"
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.get("/api/v1/labels/rolls.pdf").mock(
+            return_value=Response(200, content=b"%PDF-1.4")
+        )
+        await get_roll_labels_pdf(output_path=str(out_file))
+        assert "rolls" not in route.calls.last.request.url.params
+
+
+# ---------------------------------------------------------------------------
+# Albums
+# ---------------------------------------------------------------------------
+
+async def test_albums_list_returns_imports() -> None:
+    payload = [{"id": 1, "name": "Lincoln folder", "status": "analyzed", "page_count": 3}]
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.get("/api/v1/albums/imports").mock(return_value=Response(200, json=payload))
+        result = await albums_list()
+    assert json.loads(result)[0]["status"] == "analyzed"
+
+
+async def test_album_import_status_returns_merged_slots_and_candidates() -> None:
+    payload = {
+        "id": 1,
+        "name": "Lincoln folder",
+        "status": "analyzed",
+        "pages": [],
+        "merged_slots": [{"year": 1914, "mint": "D", "fill_state": "uncertain"}],
+        "match_candidates": [{"manifest_id": "lincoln-cents", "score": 0.9}],
+    }
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.get("/api/v1/albums/imports/1").mock(return_value=Response(200, json=payload))
+        result = await album_import_status(1)
+    parsed = json.loads(result)
+    assert parsed["merged_slots"][0]["fill_state"] == "uncertain"
+    assert parsed["match_candidates"][0]["manifest_id"] == "lincoln-cents"
+
+
+async def test_album_import_status_404_message() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.get("/api/v1/albums/imports/99").mock(
+            return_value=Response(404, json={"detail": "album import not found: 99"})
+        )
+        result = await album_import_status(99)
+    assert result == "Error: API error 404: album import not found: 99"
+
+
+# ---------------------------------------------------------------------------
+# Set needs / want list
+# ---------------------------------------------------------------------------
+
+async def test_set_needs_returns_missing_and_completion() -> None:
+    payload = {
+        "set_key": "lincoln-cents",
+        "name": "Lincoln Cents",
+        "total_slots": 100,
+        "filled": 40,
+        "completion_pct": 40.0,
+        "missing": [{"year": 1931, "mint": "S", "note": "", "key_date": True}],
+        "key_dates_missing": 1,
+    }
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.get("/api/v1/sets/lincoln-cents/needs").mock(return_value=Response(200, json=payload))
+        result = await set_needs("lincoln-cents")
+    parsed = json.loads(result)
+    assert parsed["completion_pct"] == 40.0
+    assert parsed["missing"][0]["key_date"] is True
+
+
+async def test_get_wantlist_pdf_writes_file(tmp_path) -> None:
+    pdf_bytes = b"%PDF-1.4 wantlist"
+    out_file = tmp_path / "wantlist.pdf"
+    with respx.mock(base_url="http://testserver") as mock:
+        mock.get("/api/v1/sets/lincoln-cents/wantlist.pdf").mock(
+            return_value=Response(200, content=pdf_bytes)
+        )
+        result = await get_wantlist_pdf(output_path=str(out_file), set_id="lincoln-cents")
+    assert out_file.exists()
+    assert out_file.read_bytes() == pdf_bytes
+    assert result.startswith("Saved want-list PDF to")

@@ -6,7 +6,7 @@ description: >
 
 # NumisLens
 
-You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `identify_coin`, `get_label_pdf`, `watch_status`, `list_stale`, `get_watchlist`, `submit_digest`. Follow these rules.
+You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `identify_coin`, `get_label_pdf`, `watch_status`, `list_stale`, `get_watchlist`, `submit_digest`, `rolls_list`, `roll_get`, `roll_create`, `roll_pull`, `get_roll_labels_pdf`, `albums_list`, `album_import_status`, `set_needs`, `get_wantlist_pdf`. Follow these rules.
 
 ## Money and melt questions
 
@@ -89,4 +89,20 @@ metal stale (their premiums track spot) — you do not need to trigger that.
 
 ## Sets
 
-- `list_sets` shows completion counts; `set_gaps` lists the missing date/mint slots; `set_status` gives a filled/total summary. Use these for "what am I missing?" questions.
+- `list_sets` shows completion counts; `set_gaps` lists the missing date/mint slots; `set_status` gives a filled/total summary; `set_needs` returns the same gap list plus `completion_pct` and a `key_dates_missing` count. Use these for "what am I missing?" / completion questions — NEVER answer from memory or estimate what a set needs; always call `set_needs` (or `set_gaps`/`set_status`) and cite its output.
+- `get_wantlist_pdf(output_path, set_id)` saves a printable want-list PDF (the set's missing slots) to a local path — binary PDF data cannot travel through MCP directly.
+
+## Coin rolls
+
+- A roll is a bulk mint/bank roll (e.g. a $10 roll of 50 cents) held as one unit until pulled apart. `rolls_list` (optional `status` filter: `unopened`/`searching`/`searched`/`exhausted`) and `roll_get(roll_no)` read roll records.
+- `roll_create` needs `denomination` and `count` (whole number >= 1). `cost_basis_cents` is INTEGER CENTS. `composition_name` must match an existing composition EXACTLY — leave it unset rather than guess; guessing a composition would fabricate a melt value the roll doesn't actually have.
+- VALUATION HONESTY: a roll's `face_cents`/`melt_cents`/`best_cents` are computed by the daemon from real inputs only (a known US denomination for face; a priced composition + primary spot for melt) — null means genuinely unvalued, never a value to fill in yourself. `nonstandard` (a count that differs from the denomination's usual roll size) is informational only, never a reason to override the count.
+- `roll_pull(roll_no, count, quick=[...])` pulls coins out of a roll, decrementing it (it auto-flips to `exhausted` at 0). `quick` runs each line through the SAME deterministic parser as `quick_add` to create real coin rows — every line is parsed BEFORE anything is mutated, so one bad line fails the whole call (422, roll untouched) rather than a partial pull.
+- `get_roll_labels_pdf(output_path, roll_nos=[...])` saves a QR label sheet for specific rolls (or every non-exhausted roll when omitted) to a local path.
+
+## Album photo imports
+
+- An album import turns photographed coin album/folder pages into a committed set + coin rows: create an import in the PWA, photograph pages, a vision pass analyzes them, a HUMAN reviews the parsed slots, then commits. `albums_list` and `album_import_status(import_id)` are READ-ONLY tools for you — they do not write, and you do not drive analysis or commit from the assistant.
+- `album_import_status` returns `merged_slots` (the deduped, human-reviewable slot list, each with `fill_state` of `filled`/`empty`/`uncertain`) and `match_candidates` (set manifests ranked by how much of the photographed slots they explain — `score`/`coverage` are suggestions, not a determination).
+- VISION NEVER GUESSES — HONESTY RULES: an `uncertain` slot means the vision pass could not confidently read it and REQUIRES human review before it counts as filled or empty. NEVER mark an uncertain slot yourself, and NEVER tell the user a coin exists in a slot the vision pass did not confidently confirm. If asked "did my album come in complete?" or similar, report exactly what `merged_slots`/`match_candidates` say — filled, empty, AND uncertain counts — rather than rounding uncertain up to filled or down to empty.
+- The commit step (choosing a matched manifest or a custom set name, an uncertain-slot policy, and whether to create coin rows) is a human action in the PWA, not something these tools perform — if a user asks you to "finish" or "commit" an import, point them to the Albums view in the PWA rather than inventing a commit call.

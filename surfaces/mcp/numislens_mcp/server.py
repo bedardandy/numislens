@@ -710,5 +710,287 @@ def identify_coin(accession: str) -> str:
         return f"Error: {exc}"
 
 
+@mcp.tool(
+    name="rolls_list",
+    annotations={
+        "title": "List Rolls",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def rolls_list(status: Optional[str] = None) -> str:
+    """List bulk coin rolls, optionally filtered by status.
+
+    ``status`` is one of ``unopened``, ``searching``, ``searched``,
+    ``exhausted`` (a roll flips to ``exhausted`` automatically at count 0).
+    Each roll includes ``face_cents``/``melt_cents``/``best_cents``/``basis`` —
+    these are null (never fabricated) when the roll has no known face value or
+    no priced composition. ``nonstandard`` flags a count that differs from the
+    denomination's usual mint/bank roll size (informational only).
+    """
+    try:
+        params = {"status": status} if status is not None else None
+        result = await _client().request_json("GET", "/api/v1/rolls", params=params)
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="roll_get",
+    annotations={
+        "title": "Get Roll",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def roll_get(roll_no: str) -> str:
+    """Fetch a single roll by its number (e.g. ``NR-000001``).
+
+    A missing roll surfaces a 404 error with detail ``roll not found``.
+    """
+    try:
+        result = await _client().request_json("GET", f"/api/v1/rolls/{roll_no}")
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="roll_create",
+    annotations={
+        "title": "Create Roll",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+)
+async def roll_create(
+    denomination: str,
+    count: int,
+    country: Optional[str] = None,
+    series: Optional[str] = None,
+    year: Optional[int] = None,
+    composition_name: Optional[str] = None,
+    variant: Optional[str] = None,
+    cost_basis_cents: Optional[int] = None,
+    acquired_date: Optional[str] = None,
+    acquired_source: Optional[str] = None,
+    location_id: Optional[int] = None,
+    notes: Optional[str] = None,
+) -> str:
+    """Record a new bulk coin roll (a bank/mint roll held as one unit).
+
+    ``count`` must be a whole number >= 1 (coins currently in the roll).
+    ``cost_basis_cents`` is INTEGER CENTS, never a dollar float.
+    ``composition_name`` must match an existing composition exactly — never
+    guess one; leave it unset if you are not certain, since a wrong
+    composition would fabricate a melt value. The roll is valued (face and/or
+    melt) automatically by the daemon from real inputs only — you do not
+    compute or assert its value yourself.
+
+    Returns the created roll record including its new ``roll_no``.
+    """
+    try:
+        body = _body(
+            country=country,
+            series=series,
+            year=year,
+            composition_name=composition_name,
+            variant=variant,
+            cost_basis_cents=cost_basis_cents,
+            acquired_date=acquired_date,
+            acquired_source=acquired_source,
+            location_id=location_id,
+            notes=notes,
+        )
+        body["denomination"] = denomination
+        body["count"] = count
+        result = await _client().request_json("POST", "/api/v1/rolls", json=body)
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="roll_pull",
+    annotations={
+        "title": "Pull Coins From Roll",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+)
+async def roll_pull(roll_no: str, count: int, quick: Optional[list[str]] = None) -> str:
+    """Pull ``count`` coins out of a roll, decrementing what remains.
+
+    ``quick`` is an optional list of free-text captures (at most ``count``
+    entries), each run through the SAME deterministic parser as ``quick_add``
+    to create a real coin row (``acquired_source`` set to the roll number).
+    Every entry is parsed BEFORE anything is mutated — if any one is
+    unparseable (no series or year found), the whole call fails with a 422
+    and the roll is left untouched; relay the error, don't retry with a
+    guess. Omit ``quick`` to just decrement the count without creating coins.
+
+    When the remaining count reaches 0 the roll's status flips to
+    ``exhausted`` automatically. Returns ``{roll, coins_created}`` where
+    ``coins_created`` lists the new accession numbers.
+    """
+    try:
+        body: dict[str, Any] = {"count": count}
+        if quick is not None:
+            body["quick"] = quick
+        result = await _client().request_json(
+            "POST", f"/api/v1/rolls/{roll_no}/pull", json=body
+        )
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="get_roll_labels_pdf",
+    annotations={
+        "title": "Get Roll Label PDF",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def get_roll_labels_pdf(output_path: str, roll_nos: Optional[list[str]] = None) -> str:
+    """Generate a printable roll-label sheet PDF and save it to a local path.
+
+    Binary PDF data cannot travel through MCP directly, so the file is
+    written to ``output_path`` on disk. ``roll_nos`` selects specific rolls;
+    omit it to include every non-exhausted roll.
+    """
+    try:
+        params = [("rolls", r) for r in roll_nos] if roll_nos else None
+        resp = await _client().request("GET", "/api/v1/labels/rolls.pdf", params=params)
+        Path(output_path).write_bytes(resp.content)
+        return f"Saved roll label PDF to {output_path}"
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="albums_list",
+    annotations={
+        "title": "List Album Imports",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def albums_list() -> str:
+    """List album/folder photo-import sessions with status and page counts.
+
+    Status progresses ``pending`` -> ``analyzed`` -> ``committed`` (or
+    ``discarded``). Use ``album_import_status`` for the full detail of one
+    import, including its reviewed slots and set-match candidates.
+    """
+    try:
+        result = await _client().request_json("GET", "/api/v1/albums/imports")
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="album_import_status",
+    annotations={
+        "title": "Get Album Import Status",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def album_import_status(import_id: int) -> str:
+    """Fetch one album import: pages, merged slots, and set-match candidates.
+
+    ``merged_slots`` is the deduped, human-reviewable slot list (each with a
+    ``fill_state`` of ``filled``, ``empty``, or ``uncertain``).
+    ``match_candidates`` ranks known set manifests by how much of the
+    photographed slots they explain — ``score``/``coverage`` are suggestions
+    for the human to pick from, not a determination.
+
+    HONESTY RULES — this data comes from a vision pass that NEVER guesses:
+    an ``uncertain`` slot means the vision pass could not confidently read
+    it, and it REQUIRES human review before it can count as filled or empty.
+    NEVER mark an uncertain slot yourself, and NEVER tell the user a coin
+    exists in a slot the vision pass did not confidently confirm. This tool
+    is READ-ONLY — the human reviews and commits the import through the PWA
+    (or a human explicitly instructs you to patch a specific slot they have
+    looked at); you do not resolve uncertainty by picking an answer.
+    """
+    try:
+        result = await _client().request_json(
+            "GET", f"/api/v1/albums/imports/{import_id}"
+        )
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="set_needs",
+    annotations={
+        "title": "Set Needs",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def set_needs(set_id: str) -> str:
+    """What a set is still missing: completion counts and the gap list.
+
+    ``set_id`` may be the numeric id or the set_key string. Returns
+    ``{set_key, name, total_slots, filled, completion_pct, missing, key_dates_missing}``
+    where ``missing`` lists each gap's year/mint/note and whether it is a key
+    date. THIS is the source of truth for "what am I missing" / completion
+    questions — never answer from memory or guess what a set needs.
+    """
+    try:
+        result = await _client().request_json("GET", f"/api/v1/sets/{set_id}/needs")
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="get_wantlist_pdf",
+    annotations={
+        "title": "Get Want List PDF",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def get_wantlist_pdf(output_path: str, set_id: str) -> str:
+    """Generate a printable want-list PDF (a set's missing slots) and save it.
+
+    Binary PDF data cannot travel through MCP directly, so the file is
+    written to ``output_path`` on disk. ``set_id`` may be the numeric id or
+    the set_key string.
+    """
+    try:
+        resp = await _client().request("GET", f"/api/v1/sets/{set_id}/wantlist.pdf")
+        Path(output_path).write_bytes(resp.content)
+        return f"Saved want-list PDF to {output_path}"
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
 if __name__ == "__main__":
     mcp.run()

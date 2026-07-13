@@ -19,11 +19,14 @@ def test_migrations_smoke(tmp_path):
     db_path = tmp_path / "test.db"
 
     applied = migrate(db_path)
-    assert len(applied) == 4
+    # >= (not ==) so migration-adding workstreams (rolls/005, albums/006, ...)
+    # can each land a new file without fighting over a hardcoded count.
+    assert len(applied) >= 4
     assert "001_initial.sql" in applied
     assert "002_seed_compositions.sql" in applied
     assert "003_seed_steel_cent.sql" in applied
     assert "004_stale_columns.sql" in applied
+    assert "005_rolls.sql" in applied
 
     conn = __import__("sqlite3").connect(db_path)
     try:

@@ -318,7 +318,13 @@ def test_empty_database_valid_report(ledger):
     assert rep["totals"]["gain_loss_cents"] == 0
     assert rep["spot"] == {}
     assert rep["highlights"] == []
-    assert rep["groups"] == {"sets": [], "mints": [], "series": [], "metals": []}
+    assert rep["groups"] == {
+        "sets": [],
+        "mints": [],
+        "series": [],
+        "metals": [],
+        "rolls": [],
+    }
     assert rep["data_quality"]["metals_missing_spot"] == []
     assert isinstance(rep["generated_at"], str)
 
