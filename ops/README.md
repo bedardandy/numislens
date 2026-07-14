@@ -99,9 +99,9 @@ Configuration is entirely environment-driven:
 
 - `NUMISLENS_URL` / `NUMISLENS_TOKEN` — the daemon (same token the daemon uses).
 - `VISION_OCR_URLS` — comma-separated OCR endpoints, tried in order with
-  failover (default `http://beyondmax:8080,http://framedesk:8080`).
+  failover (default `http://ocr-host-a:8080,http://ocr-host-b:8080`).
 - `VISION_VLM_URL` — the vision-LLM cross-vote endpoint (default
-  `http://p920-server:8088`).
+  `http://vlm-host:8088`).
 - `VISION_GEMMA_URL` — **optional** third voter. Unset by default; when unset or
   unreachable the pipeline runs on OCR+VLM and reports Gemma's absence in
   `tiers_unavailable`. It is never assumed up and never fatal.

@@ -1,10 +1,11 @@
 """Environment-driven configuration for the vision pipeline.
 
-Every endpoint is configurable so the pipeline is portable across the LAN GPU
-fleet. Defaults point at the boxes surveyed live on 2026-07-12:
+Every endpoint is configurable so the pipeline is portable across any LAN GPU
+fleet. The defaults are placeholders -- set the VISION_* env vars to your own
+OpenAI-compatible endpoints:
 
-- OCR (PaddleOCR-VL-1.6): both Strix boxes, tried in order with failover.
-- VLM (Qwen3.6-27B-FP8 vision): p920.
+- OCR (PaddleOCR-VL-1.6): one or more boxes, tried in order with failover.
+- VLM (Qwen3.6-27B-FP8 vision or similar): one endpoint.
 - Gemma (optional third voter): NO default — it must be opted in explicitly.
   The pipeline runs and reports its absence when unset or unreachable; a down
   Gemma is never fatal.
@@ -15,10 +16,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-# Live-surveyed defaults (2026-07-12). Override via env for other deployments.
+# Placeholder defaults -- override via env for your deployment.
 DEFAULT_DAEMON_URL = "http://127.0.0.1:8471"
-DEFAULT_OCR_URLS = "http://beyondmax:8080,http://framedesk:8080"
-DEFAULT_VLM_URL = "http://p920-server:8088"
+DEFAULT_OCR_URLS = "http://ocr-host-a:8080,http://ocr-host-b:8080"
+DEFAULT_VLM_URL = "http://vlm-host:8088"
 DEFAULT_OCR_MODEL = "PaddlePaddle/PaddleOCR-VL-1.6-GGUF:GGUF"
 DEFAULT_VLM_MODEL = "Qwen3.6-27B-FP8"
 DEFAULT_GEMMA_MODEL = "gemma-4-12b"

@@ -1,6 +1,8 @@
-# Numislens - AI Coin Identifier
+# NumisLens
 
-Numislens is a coin-collection platform built around a single SQLite ledger and a small REST daemon, with thin clients (a PWA, a Claude MCP/skill, and more) over one OpenAPI surface. The Progressive Web App (PWA) is a phone/desktop view onto that ledger: browse and add coins, organize physical locations, track set completion, watch deterministic melt values, and reconcile boxes offline. Coin identification and grading are performed by the platform's tiered vision pipeline (planned), never fabricated.
+> **Research / experimental alpha.** This is a working personal-scale system published for the curious: APIs, schemas, and UI may change without notice, the vision pipeline's real-world accuracy is unmeasured (the benchmark harness exists, the ground-truth photo set does not yet), and nothing here is a substitute for a professional appraisal. Use on a copy of data you can afford to lose.
+
+NumisLens is a coin-collection platform built around a single SQLite ledger and a small REST daemon, with thin clients (a PWA, a Claude MCP/skill, and more) over one OpenAPI surface. The Progressive Web App (PWA) is a phone/desktop view onto that ledger: browse and add coins, organize physical locations, track set completion and rolls, import coin albums from photos, watch deterministic melt values, print QR labels and want lists, and reconcile boxes offline. Coin identification and grading run through a tiered local-LLM vision pipeline behind agreement gates — values are never fabricated: every figure traces to a real input (an appraisal, a metal weight times a fetched spot price, or face value), and anything unknown is disclosed as unknown.
 
 ## Repository layout
 
@@ -84,9 +86,9 @@ python3 -m venv vision/.venv && . vision/.venv/bin/activate && pip install -e vi
 export NUMISLENS_URL=http://127.0.0.1:8471 NUMISLENS_TOKEN=...   # the daemon
 # endpoints (defaults shown): comma-separated OCR boxes w/ failover, one VLM,
 # optional Gemma (unset = skipped, its absence is reported in results)
-export VISION_OCR_URLS=http://beyondmax:8080,http://framedesk:8080
-export VISION_VLM_URL=http://p920-server:8088
-# export VISION_GEMMA_URL=http://elitegpu:8090   # optional third voter
+export VISION_OCR_URLS=http://ocr-host-a:8080,http://ocr-host-b:8080
+export VISION_VLM_URL=http://vlm-host:8088
+# export VISION_GEMMA_URL=http://gemma-host:8090   # optional third voter
 
 numislens-vision identify NL-000123     # read-only: print the gated result
 numislens-vision process  NL-000123     # + fail-safe writeback for one coin

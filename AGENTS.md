@@ -2,8 +2,7 @@
 
 Directive for coding agents (Codex, Claude, Cursor, etc.) working in this repo.
 Read this first, then `surfaces/claude/SKILL.md` for the assistant operating
-rules and `NUMISLENS-DIRECTION-2026-07-12.md` (in the Gitea workspace root) for
-the architecture and phase plan. If a change would violate an invariant below,
+rules. If a change would violate an invariant below,
 stop and reconsider — these are load-bearing.
 
 ## What this is
@@ -148,14 +147,14 @@ own package/venv (`pip install -e surfaces/mcp`). A bearer token must be set
 - One coherent change per commit; keep suites green at each commit.
 - End commit messages with the required trailer:
   `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
-- Local commits only unless a human explicitly asks to push. The repo is private
-  Gitea; **no public push without a PII/hygiene gate and sign-off.**
+- Local commits only unless a human explicitly asks to push. The canonical
+  development remote is private; the public GitHub repo is a reviewed snapshot —
+  **nothing reaches it without a PII/hygiene gate and human sign-off.**
 
 ## Pointers
 
 - Operating rules for assistants: `surfaces/claude/SKILL.md` (the ChatGPT/Gemini
   instruction files teach the same substance in adapted wording).
-- Architecture, phase plan, security, value-watch etiquette:
-  `NUMISLENS-DIRECTION-2026-07-12.md` (Gitea workspace root).
 - Regenerate the OpenAPI artifact after any route/schema change:
-  `python3 scripts/export_openapi.py` (asserts 24 `/api/v1` paths, all secured).
+  `python3 scripts/export_openapi.py` (asserts the expected `/api/v1` path
+  count, all secured — keep its constant in step with route changes).
