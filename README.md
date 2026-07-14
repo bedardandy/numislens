@@ -53,12 +53,14 @@ Melt fetching is keyless and fail-loud: it never fabricates a price and exits no
 The PWA is static and is served by the daemon — there is no separate build step or Node dependency.
 
 ```bash
+python3 -m venv .venv && . .venv/bin/activate     # most distros require a venv (PEP 668)
 pip install -e core -e daemon
-NUMISLENS_TOKEN=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))") \
-  numislens-daemon --db ~/.local/share/numislens/numislens.db
+export NUMISLENS_TOKEN=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))")
+echo "token: $NUMISLENS_TOKEN"                     # you'll paste this into the app
+numislens-daemon --db ~/.local/share/numislens/numislens.db
 ```
 
-Then open the daemon's address in a modern browser, go to **Settings**, and paste the bearer token to connect. The app is intended to be reached over LAN/Tailscale only.
+Then open **http://127.0.0.1:8471** in a modern browser (or the machine's LAN/Tailscale address from your phone), go to **Settings**, and paste the bearer token to connect — every view is gated until a token is saved. The app is intended to be reached over LAN/Tailscale only; never expose the daemon to the open internet.
 
 ## PWA views and modules
 
@@ -67,7 +69,7 @@ Then open the daemon's address in a modern browser, go to **Settings**, and past
 - `public/js/api.js` — bearer-authenticated client for the daemon REST API
 - `public/js/router.js` — hash router
 - `public/js/store.js`, `public/js/offline.js` — IndexedDB snapshot cache and offline move queue
-- `public/js/views/` — `inventory`, `coin`, `add`, `locations`, `sets`, `melt`, `cyclecount`, `settings`
+- `public/js/views/` — `inventory`, `coin`, `add`, `locations`, `sets`, `rolls`, `albums`, `melt`, `report`, `cyclecount`, `settings`
 - `public/js/photo.js`, `public/js/money.js`, `public/js/tree.js` — camera capture, dollar-input parsing, location-tree helpers
 - `public/sw.js` — service worker (its precache list is versioned per release)
 
@@ -111,7 +113,7 @@ Claude reaches the same pipeline through the MCP `identify_coin` tool (read-only
 
 ## Deployment
 
-See `DEPLOYMENT.md` for detailed deployment instructions.
+See `ops/README.md` for deployment: user-level systemd units for the daemon and the daily melt update, Litestream/dump backups (`ops/BACKUP.md`), and the LAN/Tailscale exposure guidance.
 
 ## Contributing
 
@@ -127,9 +129,9 @@ This project is licensed under the GPL-3.0 License - see the LICENSE file for de
 
 ## Acknowledgments
 
-- AI model integration using qwenVL3-30B3A
-- Numismatic grading standards based on industry practices
-- PWA technologies for enhanced user experience
+- Local vision models: PaddleOCR-VL (OCR tier) and Qwen VL–family models (cross-vote tier) behind the agreement gate — any OpenAI-compatible endpoints work
+- Spot prices from keyless public sources (gold-api.com primary, Yahoo Finance cross-check)
+- Numismatic grading buckets follow common industry practice; nothing here replaces a professional appraisal
 
 ## Support
 

@@ -24,8 +24,8 @@ When your Gemini account/tier supports Actions or OpenAPI tool import:
    with your real reachable daemon base URL (see
    [Reachability and security](#reachability-and-security) below).
 
-   The spec defines 22 secured `/api/v1/*` paths (health, coins, locations, sets, melt,
-   labels).
+   The spec defines 39 secured `/api/v1/*` paths (health, coins, locations, sets,
+   rolls, albums, melt, labels, report, watch).
 
 3. **Authentication** — configure a **Bearer** authorization header with your
    NumisLens daemon token (`NUMISLENS_TOKEN`). The daemon expects
@@ -95,7 +95,9 @@ PWA or Claude MCP surface instead — they talk to the daemon locally.
 
 ## What this surface does not do
 
-- Photo identification and automated grading are **not built yet** (a later phase).
+- Photo identification and automated grading run in the LOCAL vision pipeline
+  (`vision/`, via `numislens-vision` or the Claude MCP tools), not on this cloud
+  surface.
   The Gem must not present guessed IDs or grades from images as fact.
 - No parallel business logic — melt math, quick-add parsing, and ledger rules live
   in `core/` and `daemon/` only.

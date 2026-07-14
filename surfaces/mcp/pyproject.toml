@@ -7,6 +7,7 @@ name = "numislens-mcp"
 version = "0.1.0"
 description = "NumisLens MCP server (Model Context Protocol) over the REST daemon"
 requires-python = ">=3.10"
+license = {text = "GPL-3.0-or-later"}
 dependencies = [
     "mcp[cli]",
     "httpx",

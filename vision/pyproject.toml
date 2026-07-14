@@ -7,6 +7,7 @@ name = "numislens-vision"
 version = "0.1.0"
 description = "NumisLens tiered photo identification/grading pipeline (pure REST client)"
 requires-python = ">=3.10"
+license = {text = "GPL-3.0-or-later"}
 # httpx: talks to the daemon (fetch coin + images, writeback) and to the
 # OpenAI-compatible OCR/VLM endpoints. pillow: downscale phone photos before
 # base64 so calls stay small. NO numislens_core import, NO direct DB access —

@@ -6,7 +6,7 @@ The daemon OpenAPI spec at `/api/v1/openapi.json` is the single integration arti
 
 - **openapi.json** — the committed, generated OpenAPI spec (39 secured `/api/v1` paths). Regenerate it after any route/schema change (see below); ChatGPT and Gemini import it directly.
 - **mcp/** — a FastMCP stdio server (package `numislens-mcp`, module `numislens_mcp`) exposing 30 tools over the REST API (including `quick_add`, coin rolls, and album photo imports). See `mcp/mcp-config.example.json` to wire it into Claude Code (`.mcp.json`) or Claude Desktop. It is a REST client only (no DB access).
-- **claude/SKILL.md** — a Claude Code skill teaching the operating rules (melt/valuation via tools not arithmetic; confirm year+mintmark before adding; integer-cents money; no fabricated grades or values; quick-add unresolved contract; vision ID is a later phase).
+- **claude/SKILL.md** — a Claude Code skill teaching the operating rules (melt/valuation via tools not arithmetic; confirm year+mintmark before adding; integer-cents money; no fabricated grades or values; quick-add unresolved contract; vision ID runs in the local pipeline behind agreement gates, never guessed inline).
 - **chatgpt/** — Custom GPT with Actions: `README.md` (setup) + `instructions.md` (system prompt mirroring SKILL.md).
 - **gemini/** — Gemini Gem: `README.md` (OpenAPI import where supported, curl fallback) + `instructions.md` (same substance).
 - **siri/** — `README.md` with three field-by-field Apple Shortcuts recipes (Add Coin, Find Coin, Melt Today) hitting REST directly.

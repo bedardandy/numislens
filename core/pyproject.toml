@@ -7,6 +7,7 @@ name = "numislens-core"
 version = "0.1.0"
 description = "NumisLens core: SQLite ledger for a coin collection"
 requires-python = ">=3.10"
+license = {text = "GPL-3.0-or-later"}
 dependencies = []
 
 [project.optional-dependencies]

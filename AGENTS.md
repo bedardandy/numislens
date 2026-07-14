@@ -29,7 +29,7 @@ numislens/
 │   │   ├── manifests.py           # set-manifest load/validate
 │   │   ├── melt.py                # keyless dual-source spot fetch + melt recompute
 │   │   └── cli.py                 # `numislens` console script
-│   ├── migrations/                # 001_initial … 004_stale_columns (value-watch)
+│   ├── migrations/                # 001_initial … 006_albums (rolls, album imports)
 │   ├── sets/                      # set manifests (JSON) + manifest.schema.json
 │   └── tests/                     # pytest: cli, ledger, manifests, melt, migrations_smoke
 ├── daemon/                        # FastAPI REST + OpenAPI + bearer auth
@@ -126,11 +126,12 @@ numislens/
 Run all three before committing anything that touches their area:
 
 ```bash
-cd core            && python3 -m pytest -q     # 96 tests
-cd daemon          && python3 -m pytest -q     # 81 tests
-cd surfaces/mcp    && python3 -m pytest -q     # 25 tests (needs its own venv + `pip install -e vision`)
-cd vision          && python3 -m pytest -q     # 53 tests (own venv; no live network)
-node --test tests/js/                           # PWA money helper
+cd core            && python3 -m pytest -q
+cd daemon          && python3 -m pytest -q     # use the daemon venv's python
+cd surfaces/mcp    && python3 -m pytest -q     # needs its own venv + `pip install -e vision`
+cd vision          && python3 -m pytest -q     # own venv; no live network
+node --test tests/js/*.test.js                  # glob form (the bare-dir form breaks on Node 22)
+node --test tests/js/money.test.mjs
 python3 scripts/e2e_smoke.py                    # scratch daemon + temp DB, boots nothing external
 python3 scripts/check_sw_files.py               # sw.js precache list vs files on disk
 node --check public/js/<file>.js                # syntax-check any edited PWA module

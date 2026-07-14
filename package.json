@@ -1,25 +1,16 @@
 {
   "name": "numislens",
-  "version": "1.0.0",
-  "description": "AI-powered coin identification and grading application",
+  "version": "0.1.0",
+  "description": "NumisLens PWA test runner — the app itself is served by the daemon, not npm",
   "type": "module",
-  "main": "index.js",
   "scripts": {
-    "start": "npx serve public",
-    "dev": "npx serve -l 3000 public",
-    "test": "node tests/js/money.test.mjs"
+    "test": "node --test tests/js/*.test.js && node --test tests/js/money.test.mjs"
   },
   "keywords": [
     "pwa",
-    "ai",
     "coin",
-    "identification",
-    "grading",
+    "collection",
     "numismatics"
   ],
-  "author": "Numislens Team",
-  "license": "GPL-3.0",
-  "devDependencies": {
-    "serve": "^14.2.1"
-  }
+  "license": "GPL-3.0"
 }
