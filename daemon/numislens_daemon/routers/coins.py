@@ -14,7 +14,7 @@ from PIL import Image
 
 from ..deps import get_ledger
 from ..quickadd import parse_quick_add
-from ..schemas import AppraiseBody, CoinCreate, CoinIdentify, MoveBody, QuickAddBody
+from ..schemas import AppraiseBody, CoinCreate, CoinEdit, CoinIdentify, MoveBody, QuickAddBody
 from ..serializers import serialize_coin
 
 router = APIRouter()
@@ -212,6 +212,28 @@ def identify_coin(accession: str, body: CoinIdentify, ldb: LedgerDep) -> dict:
         accession, **body.model_dump(exclude_unset=True)
     )
     result["coin"] = serialize_coin(ldb.get_coin(accession))
+    return result
+
+
+@router.put("/coins/{accession}", tags=["coins"])
+def edit_coin(accession: str, body: CoinEdit, ldb: LedgerDep) -> dict:
+    """Apply a human correction to a coin (distinct from the vision PATCH).
+
+    Every provided field overwrites (including clearing via null); each change
+    is logged to the append-only events table with its before/after. Grade
+    fields are not editable here — grade changes go through /appraise or the
+    vision writeback so provenance stays append-only. Returns
+    ``{changed: {field: [before, after]}, coin}``.
+    """
+    fields = body.model_dump(exclude_unset=True)
+    if not fields:
+        raise HTTPException(
+            status_code=422,
+            detail="no fields to edit: provide at least one field",
+        )
+    result = ldb.edit_coin(accession, **fields)
+    if "coin" in result:
+        result["coin"] = serialize_coin(result["coin"])
     return result
 
 

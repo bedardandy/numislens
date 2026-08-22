@@ -55,6 +55,40 @@ class CoinIdentify(StrictModel):
     grade_source: Optional[str] = None
 
 
+class CoinEdit(StrictModel):
+    # Human corrections to an existing coin (PUT). Every field is optional;
+    # a field PRESENT with null CLEARS it (an explicit, event-logged
+    # correction). Grade fields are deliberately absent — grade changes flow
+    # through /appraise or the vision writeback so provenance stays
+    # append-only. Unknown fields 422 (invariant 8).
+    series: Optional[str] = None
+    year: Optional[int] = None
+    mintmark: Optional[str] = None
+    denomination: Optional[str] = None
+    country: Optional[str] = None
+    composition_id: Optional[int] = None
+    weight_g: Optional[float] = None
+    diameter_mm: Optional[float] = None
+    tpg_cert: Optional[str] = None
+    cost_basis_cents: Optional[int] = Field(
+        default=None, description="Cost basis in cents (integer); null clears."
+    )
+    acquired_date: Optional[str] = None
+    acquired_source: Optional[str] = None
+    value_est_cents: Optional[int] = Field(
+        default=None, description="Estimated value in cents (integer); null clears."
+    )
+    value_basis: Optional[str] = Field(
+        default=None,
+        description="melt | numismatic | hybrid; null clears.",
+    )
+    appraisal_confidence: Optional[float] = None
+    location_id: Optional[int] = Field(
+        default=None, description="Location id; null clears."
+    )
+    notes: Optional[str] = None
+
+
 class QuickAddBody(StrictModel):
     text: str = Field(
         description="Free-text coin capture, e.g. '1943 steel cent, box 3 slot 12, paid $4'."

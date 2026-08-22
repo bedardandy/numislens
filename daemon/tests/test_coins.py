@@ -312,3 +312,92 @@ def test_get_coin_includes_appraisals(
     body = client.get(f"/api/v1/coins/{acc}", headers=auth_headers).json()
     assert "appraisals" in body
     assert body["appraisals"][0]["appraised_by"] == "vision:cross-vote"
+
+
+def test_edit_coin_roundtrip(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()
+    response = client.put(
+        f"/api/v1/coins/{acc}",
+        json={"year": 1922, "notes": "corrected year"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["changed"]["year"] == [1921, 1922]
+    assert body["coin"]["year"] == 1922
+
+
+def test_edit_coin_clears_field_with_null(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()  # make_coin defaults set mintmark="P"
+    response = client.put(
+        f"/api/v1/coins/{acc}",
+        json={"mintmark": None},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["changed"]["mintmark"] == ["P", None]
+    assert body["coin"]["mintmark"] is None
+
+
+def test_edit_coin_rejects_grade_fields(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    # CoinEdit has no grade fields, so extra=forbid rejects them at the
+    # schema layer (invariant 8); core enforces the same rule beneath.
+    acc = make_coin()
+    response = client.put(
+        f"/api/v1/coins/{acc}",
+        json={"grade_bucket": "UNC"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert any(d.get("type") == "extra_forbidden" for d in detail)
+
+
+def test_edit_coin_unknown_field_422(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()
+    response = client.put(
+        f"/api/v1/coins/{acc}",
+        json={"mint": "P"},  # the classic assistant guess; must 422, not drop
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+def test_edit_coin_empty_body_422(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()
+    response = client.put(f"/api/v1/coins/{acc}", json={}, headers=auth_headers)
+    assert response.status_code == 422
+    assert "no fields to edit" in response.json()["detail"]
+
+
+def test_edit_coin_404(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.put(
+        "/api/v1/coins/NL-999999",
+        json={"notes": "x"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 404

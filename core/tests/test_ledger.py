@@ -452,3 +452,72 @@ def test_list_appraisals_newest_first(ledger):
     assert len(rows) == 2
     assert rows[0]["appraised_by"] == "vision:cross-vote"  # newest first
     assert rows[1]["appraised_by"] == "human"
+
+
+def test_edit_coin_updates_and_returns_diff(ledger):
+    accession = ledger.add_coin(series="Morgan Dollar", year=1885, mintmark=None)
+    loc_id = ledger.create_location("box", "Box 1")
+
+    result = ledger.edit_coin(accession, year=1885, mintmark="CC", location_id=loc_id)
+
+    assert result["changed"] == {"mintmark": [None, "CC"], "location_id": [None, loc_id]}
+    coin = result["coin"]
+    assert coin["mintmark"] == "CC"
+    assert coin["location_id"] == loc_id
+    # Unchanged fields are not in the diff even when re-sent.
+    detail = ledger.conn.execute(
+        "SELECT detail FROM events WHERE event_type = 'edited' ORDER BY id DESC LIMIT 1"
+    ).fetchone()["detail"]
+    assert json.loads(detail) == {
+        "changed": {"mintmark": [None, "CC"], "location_id": [None, loc_id]}
+    }
+
+
+def test_edit_coin_no_change_is_a_no_op(ledger):
+    accession = ledger.add_coin(series="Peace Dollar", year=1922)
+    result = ledger.edit_coin(accession, series="Peace Dollar")
+    assert result == {"changed": {}}
+    # A no-op edit writes no event.
+    count = ledger.conn.execute(
+        "SELECT COUNT(*) FROM events WHERE event_type = 'edited'"
+    ).fetchone()[0]
+    assert count == 0
+
+
+def test_edit_coin_clearing_sets_null_and_logs(ledger):
+    accession = ledger.add_coin(series="Peace Dollar", year=1922, notes="grandpa's")
+    result = ledger.edit_coin(accession, notes=None)
+    assert result["changed"] == {"notes": ["grandpa's", None]}
+    assert ledger.get_coin(accession)["notes"] is None
+
+
+def test_edit_coin_rejects_unknown_and_grade_fields(ledger):
+    accession = ledger.add_coin()
+    with pytest.raises(ValueError, match="not editable"):
+        ledger.edit_coin(accession, mint="P")
+    # Grade changes belong to appraisals/vision, not human edits.
+    with pytest.raises(ValueError, match="not editable"):
+        ledger.edit_coin(accession, grade_bucket="UNC")
+
+
+def test_edit_coin_validates_values(ledger):
+    accession = ledger.add_coin()
+    with pytest.raises(ValueError, match="value_basis"):
+        ledger.edit_coin(accession, value_basis="gutfeel")
+    with pytest.raises(ValueError, match="cost_basis_cents"):
+        ledger.edit_coin(accession, cost_basis_cents="19.99")
+    with pytest.raises(ValueError, match="unknown composition_id"):
+        ledger.edit_coin(accession, composition_id=9999)
+    with pytest.raises(LocationNotFound):
+        ledger.edit_coin(accession, location_id=424242)
+
+
+def test_edit_coin_requires_a_field(ledger):
+    accession = ledger.add_coin()
+    with pytest.raises(ValueError, match="at least one field"):
+        ledger.edit_coin(accession)
+
+
+def test_edit_coin_unknown_coin_404(ledger):
+    with pytest.raises(CoinNotFound):
+        ledger.edit_coin("NL-999999", notes="x")

@@ -311,6 +311,103 @@ class Ledger:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    # Human correction fields for edit_coin. Deliberately EXCLUDES
+    # grade_bucket/grade_source: grade changes flow through record_appraisal
+    # or the vision writeback so provenance stays append-only (AGENTS.md
+    # invariant 2). A present-but-None value CLEARS the field — an explicit
+    # human correction, event-logged like every other edit.
+    EDITABLE_FIELDS = (
+        "series",
+        "year",
+        "mintmark",
+        "denomination",
+        "country",
+        "composition_id",
+        "weight_g",
+        "diameter_mm",
+        "tpg_cert",
+        "cost_basis_cents",
+        "acquired_date",
+        "acquired_source",
+        "value_est_cents",
+        "value_basis",
+        "appraisal_confidence",
+        "location_id",
+        "notes",
+    )
+
+    def edit_coin(self, accession: str, **fields) -> dict:
+        """Apply a human correction to an existing coin; log before/after.
+
+        Only EDITABLE_FIELDS may be named; anything else raises ValueError.
+        Passing None for a field clears it. Returns ``{"changed": {field:
+        [before, after]}, "coin": <fresh row>}`` and appends an ``edited``
+        event whose detail records exactly what changed (the audit trail IS
+        the history — no field is silently overwritten).
+        """
+        coin_id = self._coin_id(accession)
+        unknown = set(fields) - set(self.EDITABLE_FIELDS)
+        if unknown:
+            raise ValueError(
+                f"not editable fields: {sorted(unknown)} "
+                "(grade changes go through appraisals)"
+            )
+        if not fields:
+            raise ValueError("edit_coin requires at least one field")
+
+        if "value_basis" in fields and fields["value_basis"] is not None:
+            if fields["value_basis"] not in VALUE_BASES:
+                raise ValueError(f"invalid value_basis: {fields['value_basis']!r}")
+        for money_field in ("cost_basis_cents", "value_est_cents"):
+            if (
+                money_field in fields
+                and fields[money_field] is not None
+                and not isinstance(fields[money_field], int)
+            ):
+                raise ValueError(f"{money_field} must be an int")
+        if "composition_id" in fields and fields["composition_id"] is not None:
+            row = self.conn.execute(
+                "SELECT id FROM compositions WHERE id = ?",
+                (fields["composition_id"],),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"unknown composition_id: {fields['composition_id']}")
+        if "location_id" in fields and fields["location_id"] is not None:
+            self._verify_location(fields["location_id"])
+
+        current = self.conn.execute(
+            "SELECT * FROM coins WHERE id = ?", (coin_id,)
+        ).fetchone()
+        changed: dict[str, list] = {}
+        for key, new_value in fields.items():
+            old_value = current[key]
+            if old_value != new_value:
+                changed[key] = [old_value, new_value]
+
+        result: dict = {"changed": changed}
+        if not changed:
+            return result
+
+        now = _utcnow()
+        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        params = [*fields.values(), coin_id]
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            self.conn.execute(f"UPDATE coins SET {set_clause} WHERE id = ?", params)
+            self.conn.execute(
+                """
+                INSERT INTO events (coin_id, event_type, at, detail)
+                VALUES (?, 'edited', ?, ?)
+                """,
+                (coin_id, now, json.dumps({"changed": changed})),
+            )
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        result["coin"] = self.get_coin(accession)
+        return result
+
     def create_location(self, kind: str, label: str, parent: int | None = None) -> int:
         if parent is not None:
             self._verify_location(parent)
