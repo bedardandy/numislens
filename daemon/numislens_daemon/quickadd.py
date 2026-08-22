@@ -23,6 +23,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from numislens_core.money import parse_dollars_to_cents as _money_to_cents
+
 Span = tuple[int, int]
 
 # --- Mintmarks -------------------------------------------------------------
@@ -108,17 +110,6 @@ _MONEY_RE = re.compile(
     r"(?:\b(?:paid|cost)\s+\$?\s*(?P<kw>\d[\d,]*(?:\.\d{1,2})?))"
     r"|(?:\$\s*(?P<dollar>\d[\d,]*(?:\.\d{1,2})?))"
 )
-
-
-def _money_to_cents(raw: str) -> int:
-    """Port of public/js/money.js dollarsToCents, integer cents, no floats."""
-    amount = raw.strip().lstrip("$").replace(",", "")
-    m = re.fullmatch(r"(\d*)(?:\.(\d{1,2}))?", amount)
-    if not m or (m.group(1) == "" and not m.group(2)):
-        raise ValueError(f"invalid dollar amount: {raw!r}")
-    dollars_part = m.group(1) or "0"
-    cents_part = (m.group(2) or "").ljust(2, "0")
-    return int(dollars_part) * 100 + int(cents_part)
 
 
 def _extract_money(text: str) -> tuple[int | None, str | None, Span | None]:

@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from . import ledger, melt
+from .money import parse_dollars_to_cents
 
 
 def resolve_db_path(args_db: str | None) -> Path:
@@ -31,10 +32,6 @@ def _dollars(cents: int | None) -> str:
     if cents is None:
         return "n/a"
     return f"${cents / 100:,.2f}"
-
-
-def _dollars_to_cents(dollars: float) -> int:
-    return round(dollars * 100)
 
 
 def _parse_set_id(raw: str) -> int | str:
@@ -91,13 +88,13 @@ def cmd_add(path: Path, args: argparse.Namespace) -> int:
     if args.diameter_mm is not None:
         kwargs["diameter_mm"] = args.diameter_mm
     if args.cost is not None:
-        kwargs["cost_basis_cents"] = _dollars_to_cents(args.cost)
+        kwargs["cost_basis_cents"] = parse_dollars_to_cents(args.cost)
     if args.acquired_date is not None:
         kwargs["acquired_date"] = args.acquired_date
     if args.acquired_source is not None:
         kwargs["acquired_source"] = args.acquired_source
     if args.value is not None:
-        kwargs["value_est_cents"] = _dollars_to_cents(args.value)
+        kwargs["value_est_cents"] = parse_dollars_to_cents(args.value)
     if args.value_basis is not None:
         kwargs["value_basis"] = args.value_basis
     if args.confidence is not None:
@@ -284,7 +281,7 @@ def cmd_appraise(path: Path, args: argparse.Namespace) -> int:
     if args.grade is not None:
         kwargs["grade_bucket"] = args.grade
     if args.value is not None:
-        kwargs["value_cents"] = _dollars_to_cents(args.value)
+        kwargs["value_cents"] = parse_dollars_to_cents(args.value)
     if args.value_basis is not None:
         kwargs["value_basis"] = args.value_basis
     if args.rationale is not None:
@@ -497,10 +494,10 @@ def _build_parser() -> argparse.ArgumentParser:
     add_p.add_argument("--tpg-cert")
     add_p.add_argument("--weight-g", type=float)
     add_p.add_argument("--diameter-mm", type=float)
-    add_p.add_argument("--cost", type=float, help="Cost in dollars")
+    add_p.add_argument("--cost", help="Cost in dollars (e.g. 19.99)")
     add_p.add_argument("--acquired-date")
     add_p.add_argument("--acquired-source")
-    add_p.add_argument("--value", type=float, help="Estimated value in dollars")
+    add_p.add_argument("--value", help="Estimated value in dollars (e.g. 50 or 12.75)")
     add_p.add_argument("--value-basis")
     add_p.add_argument("--confidence", type=float)
     add_p.add_argument("--location", type=int, help="location_id")
@@ -547,7 +544,7 @@ def _build_parser() -> argparse.ArgumentParser:
     appraise_p.add_argument("accession")
     appraise_p.add_argument("--by", required=True)
     appraise_p.add_argument("--grade", help="grade_bucket")
-    appraise_p.add_argument("--value", type=float, help="Value in dollars")
+    appraise_p.add_argument("--value", help="Value in dollars (e.g. 50 or 12.75)")
     appraise_p.add_argument("--value-basis")
     appraise_p.add_argument("--rationale")
     appraise_p.add_argument("--confidence", type=float)
