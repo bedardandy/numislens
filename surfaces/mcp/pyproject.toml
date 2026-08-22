@@ -11,7 +11,7 @@ license = {text = "GPL-3.0-or-later"}
 dependencies = [
     # mcp<2: the 2.x SDK removed mcp.server.fastmcp, which this server imports.
     "mcp[cli]>=1.8,<2",
-    "httpx",
+    "httpx>=0.27",
     # identify_coin runs the Phase-4 pipeline in-process. Install the local
     # package into this venv: pip install -e vision (see ops/README.md).
     "numislens-vision",

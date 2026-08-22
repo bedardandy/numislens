@@ -21,7 +21,7 @@ logic in a surface.
 numislens/
 ├── AGENTS.md                      # this file
 ├── README.md                      # product + PWA overview
-├── DEPLOYMENT.md, GITHUB_SETUP.md, LICENSE (GPL-3.0)
+├── LICENSE (GPL-3.0)                # deployment/ops docs live in ops/README.md
 ├── core/                          # the ledger — dependency-free, source of truth
 │   ├── numislens_core/
 │   │   ├── db.py                  # migration runner + connection helpers
@@ -65,7 +65,7 @@ numislens/
 │   ├── index.html, manifest.json, sw.js
 │   └── js/ (api, app, router, store, offline, photo, money, tree, views/*)
 ├── ops/                           # systemd units, Litestream, backup docs (never auto-enabled)
-├── scripts/                       # export_openapi.py, e2e_smoke.py, check_sw_files.py
+├── scripts/                       # export_openapi.py, e2e_smoke.py, check_sw_files.py, gen_icons.py
 └── tests/js/                      # Node test(s) for PWA helpers
 ```
 

@@ -13,8 +13,8 @@ license = {text = "GPL-3.0-or-later"}
 # base64 so calls stay small. NO numislens_core import, NO direct DB access —
 # this package is a REST client of the daemon, exactly like surfaces/mcp.
 dependencies = [
-    "httpx",
-    "pillow",
+    "httpx>=0.27",
+    "pillow>=10.4",
 ]
 
 [project.optional-dependencies]
