@@ -7,7 +7,17 @@ import io
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 from numislens_core import Ledger
 from PIL import Image
@@ -157,6 +167,7 @@ def quick_add_coin(body: QuickAddBody, ldb: LedgerDep) -> dict:
 @router.get("/coins", tags=["coins"])
 def list_coins(
     ldb: LedgerDep,
+    response: Response,
     series: str | None = None,
     year: int | None = None,
     mintmark: str | None = None,
@@ -165,7 +176,11 @@ def list_coins(
     composition_id: int | None = None,
     location_id: int | None = None,
     disposition: str | None = None,
+    limit: Annotated[int | None, Query(ge=1, le=1000)] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[dict | None]:
+    """List coins. The body stays a bare array (backward compatible); the
+    total matching count rides in ``X-Total-Count`` for paging clients."""
     filters = {
         k: v
         for k, v in {
@@ -180,8 +195,19 @@ def list_coins(
         }.items()
         if v is not None
     }
-    results = ldb.find_coins(**filters)
+    response.headers["X-Total-Count"] = str(ldb.count_coins(**filters))
+    results = ldb.find_coins(limit=limit, offset=offset, **filters)
     return [serialize_coin(c) for c in results]
+
+
+@router.get("/duplicates", tags=["data"])
+def list_duplicates(ldb: LedgerDep) -> list[dict]:
+    """Candidate duplicate identities (same series+year+mintmark).
+
+    Read-only suspect list for inherited-collection triage: double entries
+    surface with their locations; adjudication is human work.
+    """
+    return ldb.find_duplicates()
 
 
 @router.get("/compositions", tags=["coins"])

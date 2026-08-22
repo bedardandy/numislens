@@ -584,3 +584,55 @@ def test_find_coins_filters_by_disposition(ledger):
     listed = ledger.find_coins(disposition="for_sale")
     assert [c["accession_no"] for c in owned] == [b]
     assert [c["accession_no"] for c in listed] == [a]
+
+
+def test_find_coins_paging(ledger):
+    for year in (1921, 1922, 1923, 1924):
+        ledger.add_coin(series="Peace Dollar", year=year)
+
+    page1 = ledger.find_coins(limit=2)
+    page2 = ledger.find_coins(limit=2, offset=2)
+    assert [c["year"] for c in page1] == [1921, 1922]
+    assert [c["year"] for c in page2] == [1923, 1924]
+    # Bare offset past the end is empty; filters compose with paging.
+    assert ledger.find_coins(offset=99) == []
+    assert len(ledger.find_coins(year=1922)) == 1
+    assert ledger.count_coins(series="Peace Dollar") == 4
+    assert ledger.count_coins() == 4
+
+
+def test_find_coins_paging_validation(ledger):
+    with pytest.raises(ValueError, match="limit"):
+        ledger.find_coins(limit=0)
+    with pytest.raises(ValueError, match="offset"):
+        ledger.find_coins(offset=-1)
+
+
+def test_count_coins_with_location_scope(ledger):
+    cabinet = ledger.create_location("cabinet", "Cab")
+    box = ledger.create_location("box", "B1", parent=cabinet)
+    ledger.add_coin(series="Morgan Dollar")
+    inside = ledger.add_coin(series="Peace Dollar", location_id=box)
+    assert ledger.count_coins(location_id=cabinet) == 1
+    assert ledger.count_coins(location_id=box) == 1
+    assert ledger.count_coins(location_id=cabinet, series="Morgan Dollar") == 0
+    assert ledger.get_coin(inside)["series"] == "Peace Dollar"
+
+
+def test_find_duplicates_groups_by_identity(ledger):
+    a = ledger.add_coin(series="Peace Dollar", year=1922)   # dup pair
+    b = ledger.add_coin(series="Peace Dollar", year=1922)
+    c = ledger.add_coin(series="Peace Dollar", year=1922)   # trio actually
+    d = ledger.add_coin(series="Morgan Dollar", year=1885)  # singleton
+    e = ledger.add_coin(series="Morgan Dollar", year=1885, mintmark="CC")  # distinct
+    unattributed = ledger.add_coin()  # no series/year: never flagged
+
+    groups = ledger.find_duplicates()
+    assert len(groups) == 1
+    g = groups[0]
+    assert (g["series"], g["year"], g["mintmark"], g["count"]) == (
+        "Peace Dollar", 1922, None, 3
+    )
+    accessions = {m["accession_no"] for m in g["coins"]}
+    assert accessions == {a, b, c}
+    assert all(m["location_path"] is None for m in g["coins"])

@@ -95,6 +95,7 @@
           "coins"
         ],
         "summary": "List Coins",
+        "description": "List coins. The body stays a bare array (backward compatible); the\ntotal matching count rides in ``X-Total-Count`` for paging clients.",
         "operationId": "list_coins_api_v1_coins_get",
         "parameters": [
           {
@@ -224,6 +225,35 @@
               ],
               "title": "Disposition"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -304,6 +334,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/duplicates": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "List Duplicates",
+        "description": "Candidate duplicate identities (same series+year+mintmark).\n\nRead-only suspect list for inherited-collection triage: double entries\nsurface with their locations; adjudication is human work.",
+        "operationId": "list_duplicates_api_v1_duplicates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Duplicates Api V1 Duplicates Get"
                 }
               }
             }

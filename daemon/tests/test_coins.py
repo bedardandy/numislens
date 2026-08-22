@@ -482,3 +482,48 @@ def test_list_coins_invalid_disposition_422(
 ) -> None:
     response = client.get("/api/v1/coins?disposition=nope", headers=auth_headers)
     assert response.status_code == 422
+
+
+def test_list_coins_pagination_headers(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    for year in (1921, 1922, 1923, 1924):
+        make_coin({"year": year})
+
+    page = client.get("/api/v1/coins?limit=2&offset=2", headers=auth_headers)
+    assert page.status_code == 200
+    assert page.headers["X-Total-Count"] == "4"
+    assert [c["year"] for c in page.json()] == [1923, 1924]
+
+    unbounded = client.get("/api/v1/coins", headers=auth_headers)
+    assert len(unbounded.json()) == 4
+    assert unbounded.headers["X-Total-Count"] == "4"
+
+
+def test_list_coins_invalid_limit_422(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    response = client.get("/api/v1/coins?limit=0", headers=auth_headers)
+    assert response.status_code == 422
+
+
+def test_duplicates_endpoint(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    make_coin({"series": "Peace Dollar", "year": 1922})
+    make_coin({"series": "Peace Dollar", "year": 1922})
+    make_coin({"series": "Morgan Dollar", "year": 1885})
+
+    response = client.get("/api/v1/duplicates", headers=auth_headers)
+    assert response.status_code == 200
+    groups = response.json()
+    assert len(groups) == 1
+    assert (groups[0]["series"], groups[0]["year"], groups[0]["count"]) == (
+        "Peace Dollar",
+        1922,
+        2,
+    )

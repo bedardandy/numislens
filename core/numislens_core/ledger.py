@@ -236,7 +236,7 @@ class Ledger:
         ).fetchone()
         return _row_to_dict(row)
 
-    def find_coins(
+    def _filter_conditions(
         self,
         *,
         series=None,
@@ -245,12 +245,11 @@ class Ledger:
         denomination=None,
         grade_bucket=None,
         composition_id=None,
-        location_id=None,
         disposition=None,
-    ) -> list[dict]:
+    ) -> tuple[list[str], list]:
+        """Shared WHERE builder for find_coins/count_coins."""
         conditions: list[str] = []
         params: list = []
-
         if series is not None:
             conditions.append("c.series = ?")
             params.append(series)
@@ -274,18 +273,43 @@ class Ledger:
                 raise ValueError(f"invalid disposition: {disposition!r}")
             conditions.append("c.disposition = ?")
             params.append(disposition)
+        return conditions, params
 
-        where_clause = ""
-        if conditions:
-            where_clause = "WHERE " + " AND ".join(conditions)
+    @staticmethod
+    def _check_paging(limit: int | None, offset: int) -> None:
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be >= 1")
+        if offset < 0:
+            raise ValueError("offset must be >= 0")
+
+    def find_coins(
+        self,
+        *,
+        series=None,
+        year=None,
+        mintmark=None,
+        denomination=None,
+        grade_bucket=None,
+        composition_id=None,
+        location_id=None,
+        disposition=None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict]:
+        self._check_paging(limit, offset)
+        conditions, params = self._filter_conditions(
+            series=series,
+            year=year,
+            mintmark=mintmark,
+            denomination=denomination,
+            grade_bucket=grade_bucket,
+            composition_id=composition_id,
+            disposition=disposition,
+        )
 
         if location_id is not None:
             self._verify_location(location_id)
-            loc_filter = "c.location_id IN (SELECT id FROM loc_tree)"
-            if where_clause:
-                where_clause += f" AND {loc_filter}"
-            else:
-                where_clause = f"WHERE {loc_filter}"
+            all_conds = ["c.location_id IN (SELECT id FROM loc_tree)", *conditions]
             sql = f"""
                 WITH RECURSIVE loc_tree AS (
                     SELECT id FROM locations WHERE id = ?
@@ -294,19 +318,98 @@ class Ledger:
                     INNER JOIN loc_tree lt ON l.parent_id = lt.id
                 )
                 SELECT c.* FROM coins c
-                {where_clause}
+                WHERE {" AND ".join(all_conds)}
                 ORDER BY c.accession_no
             """
-            rows = self.conn.execute(sql, [location_id, *params]).fetchall()
+            query_params: list = [location_id, *params]
         else:
-            sql = f"""
-                SELECT c.* FROM coins c
-                {where_clause}
-                ORDER BY c.accession_no
-            """
-            rows = self.conn.execute(sql, params).fetchall()
+            where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+            sql = f"SELECT c.* FROM coins c{where_clause} ORDER BY c.accession_no"
+            query_params = list(params)
 
-        return [dict(row) for row in rows]
+        if limit is not None:
+            sql += " LIMIT ? OFFSET ?"
+            query_params += [limit, offset]
+        elif offset:
+            # LIMIT -1 means unlimited in SQLite; still honor a bare offset.
+            sql += " LIMIT -1 OFFSET ?"
+            query_params.append(offset)
+
+        return [dict(row) for row in self.conn.execute(sql, query_params)]
+
+    def count_coins(self, *, location_id: int | None = None, **filters) -> int:
+        """Total coins matching the same filters as find_coins (no paging)."""
+        self._check_paging(None, 0)
+        conditions, params = self._filter_conditions(**filters)
+        if location_id is not None:
+            self._verify_location(location_id)
+            all_conds = ["c.location_id IN (SELECT id FROM loc_tree)", *conditions]
+            sql = f"""
+                WITH RECURSIVE loc_tree AS (
+                    SELECT id FROM locations WHERE id = ?
+                    UNION ALL
+                    SELECT l.id FROM locations l
+                    INNER JOIN loc_tree lt ON l.parent_id = lt.id
+                )
+                SELECT COUNT(*) FROM coins c
+                WHERE {" AND ".join(all_conds)}
+            """
+            row = self.conn.execute(sql, [location_id, *params]).fetchone()
+        else:
+            where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+            row = self.conn.execute(
+                f"SELECT COUNT(*) FROM coins c{where_clause}", params
+            ).fetchone()
+        return row[0]
+
+    def find_duplicates(self) -> list[dict]:
+        """Candidate duplicate identities: same series+year+mintmark.
+
+        A blank mintmark groups with itself (two unmarked 1922 Peace dollars
+        are exactly the double-entry an inheritor needs to catch). Read-only —
+        adjudication is human work; this only surfaces the suspects with their
+        locations.
+        """
+        groups = self.conn.execute(
+            """
+            SELECT series, year, mintmark, COUNT(*) AS n
+            FROM coins
+            WHERE series IS NOT NULL AND year IS NOT NULL
+            GROUP BY series, year, mintmark
+            HAVING n > 1
+            ORDER BY n DESC, series, year, mintmark
+            """
+        ).fetchall()
+        out: list[dict] = []
+        for g in groups:
+            members = self.conn.execute(
+                """
+                SELECT accession_no, location_id FROM coins
+                WHERE series = ? AND year = ? AND mintmark IS ?
+                ORDER BY accession_no
+                """,
+                (g["series"], g["year"], g["mintmark"]),
+            ).fetchall()
+            out.append(
+                {
+                    "series": g["series"],
+                    "year": g["year"],
+                    "mintmark": g["mintmark"],
+                    "count": g["n"],
+                    "coins": [
+                        {
+                            "accession_no": m["accession_no"],
+                            "location_path": (
+                                self.location_path(m["location_id"])
+                                if m["location_id"] is not None
+                                else None
+                            ),
+                        }
+                        for m in members
+                    ],
+                }
+            )
+        return out
 
     def list_compositions(self) -> list[dict]:
         rows = self.conn.execute(
