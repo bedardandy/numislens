@@ -14,6 +14,8 @@ dependencies = [
     "python-multipart",
     "fpdf2",
     "segno",
+    # Image upload hardening: decode-validation, EXIF strip, downscale-on-store.
+    "pillow",
 ]
 
 [project.optional-dependencies]

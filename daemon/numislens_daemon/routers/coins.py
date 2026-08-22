@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from numislens_core import Ledger
+from PIL import Image
 
 from ..deps import get_ledger
 from ..quickadd import parse_quick_add
@@ -19,12 +21,65 @@ router = APIRouter()
 
 LedgerDep = Annotated[Ledger, Depends(get_ledger)]
 
-_CONTENT_TYPE_EXT = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/gif": "gif",
-}
+# Upload hardening: a strict content-type ALLOWLIST (no image/* wildcard —
+# e.g. image/svg+xml is scriptable and heic renders inconsistently), a size
+# cap, and re-encode-on-store. Re-encoding through Pillow drops EXIF metadata
+# (phone photos carry GPS coordinates — these images are meant to be shared or
+# listed publicly later) and bounds stored dimensions.
+ALLOWED_IMAGE_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
+MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB per uploaded image
+MAX_IMAGE_EDGE = 1600  # px; longest edge after downscale (aspect preserved)
+
+_FORMAT_EXT = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
+_CHUNK = 1 << 20
+
+
+def _read_capped(upload: UploadFile, kind: str) -> bytes:
+    buf = io.BytesIO()
+    while True:
+        chunk = upload.file.read(_CHUNK)
+        if not chunk:
+            break
+        buf.write(chunk)
+        if buf.tell() > MAX_IMAGE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"{kind}: image exceeds the {MAX_IMAGE_BYTES // (1024 * 1024)} MB limit",
+            )
+    return buf.getvalue()
+
+
+def _reencode_stripped(data: bytes, kind: str) -> tuple[bytes, str]:
+    """Decode-validate, downscale, and re-encode an uploaded image.
+
+    Returns (processed_bytes, file_extension). Decoding validates that the
+    bytes really are an image regardless of the client-declared content type;
+    re-saving without an EXIF block strips all metadata; oversized longest
+    edges are downscaled with aspect preserved.
+    """
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+    except Exception:
+        raise HTTPException(
+            status_code=422, detail=f"{kind}: not a decodable image"
+        )
+    fmt = (img.format or "").upper()
+    ext = _FORMAT_EXT.get(fmt)
+    if ext is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{kind}: unsupported image format: {fmt or 'unknown'} "
+                    "(allowed: JPEG, PNG, WEBP)",
+        )
+    if max(img.size) > MAX_IMAGE_EDGE:
+        img.thumbnail((MAX_IMAGE_EDGE, MAX_IMAGE_EDGE), Image.Resampling.LANCZOS)
+    # JPEG cannot store alpha/palette modes; flatten onto white like a scan.
+    if fmt == "JPEG" and img.mode not in ("L", "RGB"):
+        img = img.convert("RGB")
+    out = io.BytesIO()
+    img.save(out, format=fmt)  # no exif/icc kwargs => metadata dropped
+    return out.getvalue(), ext
 
 
 @router.post("/coins", status_code=status.HTTP_201_CREATED, tags=["coins"])
@@ -228,22 +283,21 @@ def upload_coin_images(
     ):
         if upload is None:
             continue
-        if upload.content_type is None or not upload.content_type.startswith("image/"):
+        if upload.content_type not in ALLOWED_IMAGE_TYPES:
             raise HTTPException(
                 status_code=422,
-                detail=f"{kind}: not an image content-type: {upload.content_type}",
+                detail=f"{kind}: unsupported content-type: {upload.content_type} "
+                        "(allowed: image/jpeg, image/png, image/webp)",
             )
         # Sync endpoint + sync get_ledger dependency run in the same worker
         # thread, so the SQLite connection is used from its creating thread.
         # Read the underlying spooled file synchronously (no await).
-        data = upload.file.read()
-        digest = hashlib.sha256(data).hexdigest()
-        ext = _CONTENT_TYPE_EXT.get(
-            upload.content_type, upload.content_type.split("/")[-1]
-        )
+        data = _read_capped(upload, kind)
+        processed, ext = _reencode_stripped(data, kind)
+        digest = hashlib.sha256(processed).hexdigest()
         dest = images_dir / f"{digest}.{ext}"
         if not dest.exists():
-            dest.write_bytes(data)
+            dest.write_bytes(processed)
         rec = ldb.add_image(accession, kind, digest, str(dest))
         results.append(rec)
 
