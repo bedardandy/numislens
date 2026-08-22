@@ -173,6 +173,7 @@ export async function renderCoin(el, accession) {
   addDetailRow(dl, 'Value basis', coin.value_basis);
   addDetailRow(dl, 'Appraisal confidence', coin.appraisal_confidence);
   addDetailRow(dl, 'Last appraised', coin.last_appraised);
+  addDetailRow(dl, 'Value refreshed', coin.value_refreshed_at);
   addDetailRow(dl, 'Acquired date', coin.acquired_date);
   addDetailRow(dl, 'Acquired source', coin.acquired_source);
   addDetailRow(dl, 'Created at', coin.created_at);

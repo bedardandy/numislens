@@ -1,0 +1,11 @@
+-- Value-refresh provenance.
+--
+-- The daily melt recompute used to stamp last_appraised on melt-basis coins,
+-- conflating "repriced from spot" with "appraised" and eroding the one
+-- appraisal-provenance column (whose only legitimate writer is
+-- record_appraisal). Melt recomputes now stamp value_refreshed_at instead;
+-- last_appraised changes ONLY when a real appraisal is recorded.
+-- Additive only: one nullable column on coins. Append-only tables untouched.
+-- No BEGIN/COMMIT: the migration runner wraps this file in a single atomic
+-- transaction (see db.py).
+ALTER TABLE coins ADD COLUMN value_refreshed_at TEXT;

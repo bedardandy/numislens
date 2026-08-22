@@ -167,10 +167,57 @@ def test_update_melt_values_melt_basis_exact_math(ledger):
     coin = ledger.get_coin(accession)
 
     assert coin["value_est_cents"] == SILVER_DOLLAR_MELT_CENTS == 4641
-    assert coin["last_appraised"] is not None
+    assert coin["value_refreshed_at"] is not None
+    assert coin["last_appraised"] is None
     assert summary["updated"] == [
         {"accession": accession, "melt_cents": 4641}
     ]
+
+
+def test_update_melt_values_never_touches_last_appraised(ledger):
+    """Melt repricing is not an appraisal: last_appraised keeps its meaning."""
+    comp_id = _silver_dollar_comp_id(ledger.conn)
+    _insert_spot(ledger.conn, "XAG", 6001)
+    accession = ledger.add_coin(composition_id=comp_id, value_basis="melt")
+
+    ledger.record_appraisal(accession, "human", value_cents=123456)
+    appraised_at = ledger.get_coin(accession)["last_appraised"]
+    assert appraised_at is not None
+
+    update_melt_values(ledger.conn)
+    coin = ledger.get_coin(accession)
+    # A valued appraisal moved the coin off melt basis, so the daily recompute
+    # records only the hybrid floor — the human value and provenance survive.
+    assert coin["value_est_cents"] == 123456
+    assert coin["last_appraised"] == appraised_at
+    assert coin["value_refreshed_at"] is None
+
+
+def test_valued_appraisal_moves_melt_coin_to_hybrid(ledger):
+    comp_id = _silver_dollar_comp_id(ledger.conn)
+    _insert_spot(ledger.conn, "XAG", 6001)
+    accession = ledger.add_coin(composition_id=comp_id, value_basis="melt")
+
+    ledger.record_appraisal(accession, "human", value_cents=123456)
+    coin = ledger.get_coin(accession)
+    assert coin["value_basis"] == "hybrid"
+
+    summary = update_melt_values(ledger.conn)
+    coin = ledger.get_coin(accession)
+    assert coin["value_est_cents"] == 123456
+    assert {"accession": accession, "melt_floor_cents": SILVER_DOLLAR_MELT_CENTS} in (
+        summary["hybrid_floors"]
+    )
+
+
+def test_grade_only_appraisal_keeps_melt_basis(ledger):
+    """A grade-only appraisal (no value) must not move a melt coin off melt."""
+    comp_id = _silver_dollar_comp_id(ledger.conn)
+    _insert_spot(ledger.conn, "XAG", 6001)
+    accession = ledger.add_coin(composition_id=comp_id, value_basis="melt")
+
+    ledger.record_appraisal(accession, "vision:local-vlm", grade_bucket="VF")
+    assert ledger.get_coin(accession)["value_basis"] == "melt"
 
 
 def test_update_melt_values_hybrid_not_overwritten(ledger):

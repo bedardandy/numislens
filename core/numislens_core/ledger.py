@@ -537,6 +537,17 @@ class Ledger:
             if value_cents is not None:
                 updates.append("value_est_cents = ?")
                 update_params.append(value_cents)
+                # A valued appraisal moves a melt-basis coin OFF melt (the docs'
+                # stated behavior, previously unenforced): otherwise the daily
+                # melt recompute would silently stomp the human's value back to
+                # spot. 'hybrid' keeps the melt floor visible via the daily run
+                # while the human estimate becomes the headline number.
+                if value_basis is None:
+                    row = self.conn.execute(
+                        "SELECT value_basis FROM coins WHERE id = ?", (coin_id,)
+                    ).fetchone()
+                    if row["value_basis"] == "melt":
+                        updates.append("value_basis = 'hybrid'")
             if value_basis is not None:
                 updates.append("value_basis = ?")
                 update_params.append(value_basis)

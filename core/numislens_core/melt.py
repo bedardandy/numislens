@@ -324,7 +324,7 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
                 conn.execute(
                     """
                     UPDATE coins
-                    SET value_est_cents = ?, last_appraised = ?
+                    SET value_est_cents = ?, value_refreshed_at = ?
                     WHERE accession_no = ?
                     """,
                     (melt_cents, now, row["accession_no"]),
