@@ -47,8 +47,10 @@ SERVER_URL = "https://numislens.YOUR-TAILNET-NAME.ts.net"
 # GET /api/v1/labels/rolls.pdf (39 total). Wave 2 lifecycle adds
 # POST /api/v1/coins/{accession}/disposition and GET /api/v1/portfolio/realized
 # (PUT /api/v1/coins/{accession} reuses the existing coin template) — 41 total.
+# Data portability adds GET /api/v1/export/coins.csv and
+# POST /api/v1/import/coins.csv — 43 total.
 # Assert the real number so an accidental route drop/add is caught at export.
-EXPECTED_PATH_COUNT = 41
+EXPECTED_PATH_COUNT = 43
 
 
 def build_spec() -> dict:

@@ -12,7 +12,18 @@ from numislens_core.db import init_db
 from .auth import require_token
 from .config import Settings, resolve_token
 from .errors import register_error_handlers
-from .routers import albums, coins, labels, locations, melt, report, rolls, sets, watch
+from .routers import (
+    albums,
+    coins,
+    import_export,
+    labels,
+    locations,
+    melt,
+    report,
+    rolls,
+    sets,
+    watch,
+)
 
 
 def create_app(
@@ -60,6 +71,7 @@ def create_app(
     router.include_router(watch.router)
     router.include_router(rolls.router)
     router.include_router(albums.router)
+    router.include_router(import_export.router)
 
     app.include_router(router)
     register_error_handlers(app)

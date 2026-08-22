@@ -2517,6 +2517,80 @@
           }
         ]
       }
+    },
+    "/api/v1/export/coins.csv": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Export Coins Csv",
+        "description": "Every coin as CSV — stable columns, integer cents, composition by name,\nlocation by path. ``accession_no`` is informational on import (ignored).",
+        "operationId": "export_coins_csv_api_v1_export_coins_csv_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/import/coins.csv": {
+      "post": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Import Coins Csv",
+        "description": "Bulk-add coins from a CSV exported by (or shaped like) this endpoint.\n\nStrict all-or-nothing: every row is validated before anything is created;\nany problem returns 422 with every row error listed and an unchanged\nledger. ``accession_no`` is ignored (server-assigned); unknown locations/\ncompositions are errors, never auto-created.",
+        "operationId": "import_coins_csv_api_v1_import_coins_csv_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_coins_csv_api_v1_import_coins_csv_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Import Coins Csv Api V1 Import Coins Csv Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2620,6 +2694,20 @@
           "accession"
         ],
         "title": "AssignBody"
+      },
+      "Body_import_coins_csv_api_v1_import_coins_csv_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_coins_csv_api_v1_import_coins_csv_post"
       },
       "Body_upload_coin_images_api_v1_coins__accession__images_post": {
         "properties": {
