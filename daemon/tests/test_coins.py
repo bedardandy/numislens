@@ -401,3 +401,84 @@ def test_edit_coin_404(
         headers=auth_headers,
     )
     assert response.status_code == 404
+
+
+def test_disposition_lifecycle_roundtrip(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()
+    listed = client.post(
+        f"/api/v1/coins/{acc}/disposition",
+        json={"disposition": "for_sale"},
+        headers=auth_headers,
+    )
+    assert listed.status_code == 200
+    assert listed.json()["disposition"] == "for_sale"
+
+    sold = client.post(
+        f"/api/v1/coins/{acc}/disposition",
+        json={"disposition": "sold", "sold_price_cents": 12500, "sold_date": "2026-08-22"},
+        headers=auth_headers,
+    )
+    assert sold.status_code == 200
+    body = sold.json()
+    assert (body["disposition"], body["sold_price_cents"]) == ("sold", 12500)
+
+    realized = client.get("/api/v1/portfolio/realized", headers=auth_headers)
+    assert realized.status_code == 200
+    assert realized.json()["realized_pnl_cents"] == 7500  # 12500 - 5000 cost basis
+
+
+def test_disposition_sold_without_price_422(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()
+    response = client.post(
+        f"/api/v1/coins/{acc}/disposition",
+        json={"disposition": "sold"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert "sold_price_cents" in response.json()["detail"]
+
+
+def test_disposition_unknown_state_422(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()
+    response = client.post(
+        f"/api/v1/coins/{acc}/disposition",
+        json={"disposition": "trashed"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+def test_list_coins_filters_by_disposition(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()
+    client.post(
+        f"/api/v1/coins/{acc}/disposition",
+        json={"disposition": "for_sale"},
+        headers=auth_headers,
+    )
+    owned = client.get("/api/v1/coins?disposition=owned", headers=auth_headers)
+    assert owned.json() == []
+    listed = client.get("/api/v1/coins?disposition=for_sale", headers=auth_headers)
+    assert [c["accession_no"] for c in listed.json()] == [acc]
+
+
+def test_list_coins_invalid_disposition_422(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    response = client.get("/api/v1/coins?disposition=nope", headers=auth_headers)
+    assert response.status_code == 422

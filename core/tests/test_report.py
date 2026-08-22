@@ -350,3 +350,44 @@ def test_location_path_matches_ledger(ledger):
     rep = build_appraisal_report(ledger.conn)
     (h,) = [h for h in rep["highlights"] if h["accession_no"] == acc]
     assert h["location_path"] == ledger.location_path(slot) == "Box A > Slot 3"
+
+
+def test_realized_summary_math_and_disclosure(ledger):
+    from numislens_core.report import realized_summary
+
+    a = ledger.add_coin(cost_basis_cents=1000, series="Morgan Dollar")
+    b = ledger.add_coin(series="Peace Dollar")  # no cost basis on purpose
+    ledger.set_disposition(a, "sold", sold_price_cents=2500)
+    ledger.set_disposition(b, "sold", sold_price_cents=400)
+
+    s = realized_summary(ledger.conn)
+    assert s["sold_count"] == 2
+    assert s["proceeds_cents"] == 2900
+    assert s["cost_basis_total_cents"] == 1000
+    assert s["realized_pnl_cents"] == 1900
+    # The unbasis'd sale is disclosed, never imputed as zero-cost profit.
+    assert s["missing_cost_count"] == 1
+
+
+def test_realized_summary_empty_ledger(ledger):
+    from numislens_core.report import realized_summary
+
+    s = realized_summary(ledger.conn)
+    assert s == {
+        "sold_count": 0,
+        "proceeds_cents": 0,
+        "cost_basis_total_cents": 0,
+        "realized_pnl_cents": 0,
+        "missing_cost_count": 0,
+        "missing_price_count": 0,
+    }
+
+
+def test_appraisal_report_includes_realized_block(ledger):
+    from numislens_core.report import build_appraisal_report
+
+    a = ledger.add_coin(cost_basis_cents=500)
+    ledger.set_disposition(a, "sold", sold_price_cents=900)
+    report = build_appraisal_report(ledger.conn)
+    assert report["realized"]["sold_count"] == 1
+    assert report["realized"]["realized_pnl_cents"] == 400

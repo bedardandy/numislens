@@ -103,6 +103,19 @@ class MoveBody(StrictModel):
     )
 
 
+class DispositionBody(StrictModel):
+    # Lifecycle transition: owned | for_sale | sold | discarded. Marking sold
+    # REQUIRES sold_price_cents (0 = giveaway — a real outcome, not an unknown);
+    # date/venue are optional because they are often genuinely unknown.
+    disposition: str
+    sold_date: Optional[str] = None
+    sold_price_cents: Optional[int] = Field(
+        default=None,
+        description="Realized price in cents (integer); required when disposition='sold'.",
+    )
+    sold_venue: Optional[str] = None
+
+
 class AppraiseBody(StrictModel):
     appraised_by: str
     grade_bucket: Optional[str] = None

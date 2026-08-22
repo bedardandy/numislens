@@ -14,7 +14,15 @@ from PIL import Image
 
 from ..deps import get_ledger
 from ..quickadd import parse_quick_add
-from ..schemas import AppraiseBody, CoinCreate, CoinEdit, CoinIdentify, MoveBody, QuickAddBody
+from ..schemas import (
+    AppraiseBody,
+    CoinCreate,
+    CoinEdit,
+    CoinIdentify,
+    DispositionBody,
+    MoveBody,
+    QuickAddBody,
+)
 from ..serializers import serialize_coin
 
 router = APIRouter()
@@ -156,6 +164,7 @@ def list_coins(
     grade_bucket: str | None = None,
     composition_id: int | None = None,
     location_id: int | None = None,
+    disposition: str | None = None,
 ) -> list[dict | None]:
     filters = {
         k: v
@@ -167,6 +176,7 @@ def list_coins(
             "grade_bucket": grade_bucket,
             "composition_id": composition_id,
             "location_id": location_id,
+            "disposition": disposition,
         }.items()
         if v is not None
     }
@@ -262,6 +272,24 @@ def get_coin_image(
 def move_coin(accession: str, body: MoveBody, ldb: LedgerDep) -> dict | None:
     ldb.move_coin(accession, body.location_id, expected_from=body.expected_from_location_id)
     return serialize_coin(ldb.get_coin(accession))
+
+
+@router.post("/coins/{accession}/disposition", tags=["coins"])
+def set_disposition(accession: str, body: DispositionBody, ldb: LedgerDep) -> dict:
+    """Move a coin through owned -> for_sale -> sold (or discarded).
+
+    Marking sold requires ``sold_price_cents`` (0 = a giveaway — a real
+    outcome, not an unknown). Every transition appends a 'disposition' event;
+    non-sold states clear the sold_* fields. Returns the fresh coin row.
+    """
+    coin = ldb.set_disposition(
+        accession,
+        body.disposition,
+        sold_date=body.sold_date,
+        sold_price_cents=body.sold_price_cents,
+        sold_venue=body.sold_venue,
+    )
+    return serialize_coin(coin)
 
 
 @router.post("/coins/{accession}/appraise", tags=["coins"])

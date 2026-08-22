@@ -208,6 +208,22 @@
               ],
               "title": "Location Id"
             }
+          },
+          {
+            "name": "disposition",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Disposition"
+            }
           }
         ],
         "responses": {
@@ -443,6 +459,64 @@
             "bearerAuth": []
           }
         ]
+      },
+      "put": {
+        "tags": [
+          "coins"
+        ],
+        "summary": "Edit Coin",
+        "description": "Apply a human correction to a coin (distinct from the vision PATCH).\n\nEvery provided field overwrites (including clearing via null); each change\nis logged to the append-only events table with its before/after. Grade\nfields are not editable here — grade changes go through /appraise or the\nvision writeback so provenance stays append-only. Returns\n``{changed: {field: [before, after]}, coin}``.",
+        "operationId": "edit_coin_api_v1_coins__accession__put",
+        "parameters": [
+          {
+            "name": "accession",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Accession"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoinEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Edit Coin Api V1 Coins  Accession  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/coins/{accession}/images/{content_hash}": {
@@ -543,6 +617,66 @@
                     }
                   ],
                   "title": "Response Move Coin Api V1 Coins  Accession  Move Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/coins/{accession}/disposition": {
+      "post": {
+        "tags": [
+          "coins"
+        ],
+        "summary": "Set Disposition",
+        "description": "Move a coin through owned -> for_sale -> sold (or discarded).\n\nMarking sold requires ``sold_price_cents`` (0 = a giveaway — a real\noutcome, not an unknown). Every transition appends a 'disposition' event;\nnon-sold states clear the sold_* fields. Returns the fresh coin row.",
+        "operationId": "set_disposition_api_v1_coins__accession__disposition_post",
+        "parameters": [
+          {
+            "name": "accession",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Accession"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispositionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Set Disposition Api V1 Coins  Accession  Disposition Post"
                 }
               }
             }
@@ -1444,6 +1578,35 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/portfolio/realized": {
+      "get": {
+        "tags": [
+          "report"
+        ],
+        "summary": "Portfolio Realized",
+        "description": "Realized P&L over sold coins (proceeds minus cost basis).\n\nMissing inputs are disclosed (``missing_cost_count``), never imputed —\nthe no-fabrication rule applies to profit as much as to value.",
+        "operationId": "portfolio_realized_api_v1_portfolio_realized_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Portfolio Realized Api V1 Portfolio Realized Get"
                 }
               }
             }
@@ -2747,6 +2910,204 @@
         "type": "object",
         "title": "CoinCreate"
       },
+      "CoinEdit": {
+        "properties": {
+          "series": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "mintmark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mintmark"
+          },
+          "denomination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denomination"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "composition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composition Id"
+          },
+          "weight_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight G"
+          },
+          "diameter_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diameter Mm"
+          },
+          "tpg_cert": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tpg Cert"
+          },
+          "cost_basis_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Cents",
+            "description": "Cost basis in cents (integer); null clears."
+          },
+          "acquired_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired Date"
+          },
+          "acquired_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired Source"
+          },
+          "value_est_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Est Cents",
+            "description": "Estimated value in cents (integer); null clears."
+          },
+          "value_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Basis",
+            "description": "melt | numismatic | hybrid; null clears."
+          },
+          "appraisal_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appraisal Confidence"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id",
+            "description": "Location id; null clears."
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CoinEdit"
+      },
       "CoinIdentify": {
         "properties": {
           "series": {
@@ -2976,6 +3337,54 @@
           "reason"
         ],
         "title": "DigestItem"
+      },
+      "DispositionBody": {
+        "properties": {
+          "disposition": {
+            "type": "string",
+            "title": "Disposition"
+          },
+          "sold_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Date"
+          },
+          "sold_price_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Price Cents",
+            "description": "Realized price in cents (integer); required when disposition='sold'."
+          },
+          "sold_venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Venue"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "disposition"
+        ],
+        "title": "DispositionBody"
       },
       "HTTPValidationError": {
         "properties": {

@@ -43,6 +43,39 @@ def face_value_cents(denomination: str | None, country: str | None) -> int | Non
     return FACE_CENTS.get(denomination.strip().lower())
 
 
+def realized_summary(conn: sqlite3.Connection) -> dict:
+    """Realized P&L over coins with disposition='sold'. Pure read.
+
+    proceeds minus cost basis across sold coins; missing inputs are DISCLOSED,
+    never imputed — a sold coin without a recorded cost basis widens
+    ``missing_cost_count`` rather than silently counting as zero-basis profit.
+    """
+    row = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS sold_count,
+            COALESCE(SUM(sold_price_cents), 0) AS proceeds_cents,
+            COALESCE(SUM(cost_basis_cents), 0) AS cost_basis_cents,
+            SUM(CASE WHEN cost_basis_cents IS NULL THEN 1 ELSE 0 END)
+                AS missing_cost_count,
+            SUM(CASE WHEN sold_price_cents IS NULL THEN 1 ELSE 0 END)
+                AS missing_price_count
+        FROM coins
+        WHERE disposition = 'sold'
+        """
+    ).fetchone()
+    proceeds = int(row["proceeds_cents"])
+    cost = int(row["cost_basis_cents"])
+    return {
+        "sold_count": row["sold_count"],
+        "proceeds_cents": proceeds,
+        "cost_basis_total_cents": cost,
+        "realized_pnl_cents": proceeds - cost,
+        "missing_cost_count": row["missing_cost_count"] or 0,
+        "missing_price_count": row["missing_price_count"] or 0,
+    }
+
+
 def _location_path(loc_map: dict[int, tuple[int | None, str]], location_id: int | None) -> str | None:
     """Replicate Ledger.location_path's ' > '-joined ancestor labels, in Python.
 
@@ -424,4 +457,5 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
             "metals_missing_spot": metals_missing_spot,
             "rolls_unvalued_count": rolls_unvalued_count,
         },
+        "realized": realized_summary(conn),
     }

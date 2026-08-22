@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
 from numislens_core import Ledger, build_appraisal_report
+from numislens_core.report import realized_summary
 
 from ..deps import get_ledger
 from ..report_pdf import render_appraisal_pdf
@@ -22,6 +23,16 @@ TopParam = Annotated[int, Query(ge=1, le=100)]
 def appraisal_json(ldb: LedgerDep, top: TopParam = 10) -> dict:
     # Verbatim core dict: all money is integer cents; the PWA formats client-side.
     return build_appraisal_report(ldb.conn, top_n=top)
+
+
+@router.get("/portfolio/realized", tags=["report"])
+def portfolio_realized(ldb: LedgerDep) -> dict:
+    """Realized P&L over sold coins (proceeds minus cost basis).
+
+    Missing inputs are disclosed (``missing_cost_count``), never imputed —
+    the no-fabrication rule applies to profit as much as to value.
+    """
+    return realized_summary(ldb.conn)
 
 
 @router.get("/report/appraisal.pdf", tags=["report"])

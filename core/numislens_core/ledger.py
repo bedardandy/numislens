@@ -13,6 +13,7 @@ GRADE_BUCKETS = frozenset({"AG", "G", "VG", "F", "VF", "XF", "AU", "UNC", "PROOF
 GRADE_SOURCES = frozenset({"local-vlm", "cross-vote", "cloud", "human", "tpg"})
 VALUE_BASES = frozenset({"melt", "numismatic", "hybrid"})
 IMAGE_KINDS = frozenset({"obverse", "reverse", "edge", "slab"})
+DISPOSITIONS = frozenset({"owned", "for_sale", "sold", "discarded"})
 
 
 class LedgerError(Exception):
@@ -245,6 +246,7 @@ class Ledger:
         grade_bucket=None,
         composition_id=None,
         location_id=None,
+        disposition=None,
     ) -> list[dict]:
         conditions: list[str] = []
         params: list = []
@@ -267,6 +269,11 @@ class Ledger:
         if composition_id is not None:
             conditions.append("c.composition_id = ?")
             params.append(composition_id)
+        if disposition is not None:
+            if disposition not in DISPOSITIONS:
+                raise ValueError(f"invalid disposition: {disposition!r}")
+            conditions.append("c.disposition = ?")
+            params.append(disposition)
 
         where_clause = ""
         if conditions:
@@ -972,3 +979,73 @@ class Ledger:
                     json.dumps({"from": from_location, "to": location_id}),
                 ),
             )
+
+    def set_disposition(
+        self,
+        accession: str,
+        disposition: str,
+        *,
+        sold_date: str | None = None,
+        sold_price_cents: int | None = None,
+        sold_venue: str | None = None,
+    ) -> dict:
+        """Move a coin through the owned -> for_sale -> sold lifecycle.
+
+        ``disposition`` is one of ``owned | for_sale | sold | discarded``.
+        Marking 'sold' REQUIRES an explicit ``sold_price_cents`` (0 is valid —
+        a giveaway is a real outcome, not a missing fact); date and venue are
+        optional because they are often genuinely unknown. Any non-sold state
+        clears the sold_* fields (a correction moves the facts with it). Every
+        transition appends a 'disposition' event; rows are never deleted.
+
+        Returns the fresh coin row.
+        """
+        if disposition not in DISPOSITIONS:
+            raise ValueError(f"invalid disposition: {disposition!r}")
+        coin_id = self._coin_id(accession)
+        if disposition == "sold":
+            if sold_price_cents is None:
+                raise ValueError(
+                    "marking sold requires sold_price_cents "
+                    "(use 0 for a giveaway — never leave it unknown)"
+                )
+            if not isinstance(sold_price_cents, int):
+                raise ValueError("sold_price_cents must be an int")
+        else:
+            sold_date = sold_price_cents = sold_venue = None
+
+        current = self.conn.execute(
+            "SELECT disposition FROM coins WHERE id = ?", (coin_id,)
+        ).fetchone()
+        previous = current["disposition"]
+        now = _utcnow()
+
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            self.conn.execute(
+                """
+                UPDATE coins
+                SET disposition = ?, sold_date = ?, sold_price_cents = ?, sold_venue = ?
+                WHERE id = ?
+                """,
+                (disposition, sold_date, sold_price_cents, sold_venue, coin_id),
+            )
+            detail: dict = {"from": previous, "to": disposition}
+            if disposition == "sold":
+                detail["sold"] = {
+                    "date": sold_date,
+                    "price_cents": sold_price_cents,
+                    "venue": sold_venue,
+                }
+            self.conn.execute(
+                """
+                INSERT INTO events (coin_id, event_type, at, detail)
+                VALUES (?, 'disposition', ?, ?)
+                """,
+                (coin_id, now, json.dumps(detail)),
+            )
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return self.get_coin(accession)

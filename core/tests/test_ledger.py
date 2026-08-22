@@ -521,3 +521,66 @@ def test_edit_coin_requires_a_field(ledger):
 def test_edit_coin_unknown_coin_404(ledger):
     with pytest.raises(CoinNotFound):
         ledger.edit_coin("NL-999999", notes="x")
+
+
+def test_set_disposition_sold_requires_price(ledger):
+    accession = ledger.add_coin(cost_basis_cents=500)
+    with pytest.raises(ValueError, match="sold_price_cents"):
+        ledger.set_disposition(accession, "sold")
+    # 0 is a legitimate outcome (giveaway) and must be accepted.
+    coin = ledger.set_disposition(
+        accession, "sold", sold_date="2026-08-22", sold_price_cents=0
+    )
+    assert coin["disposition"] == "sold"
+    assert coin["sold_price_cents"] == 0
+
+
+def test_set_disposition_full_sale_and_event(ledger):
+    accession = ledger.add_coin(cost_basis_cents=1000)
+    coin = ledger.set_disposition(
+        accession,
+        "sold",
+        sold_date="2026-08-01",
+        sold_price_cents=25000,
+        sold_venue="eBay",
+    )
+    assert (coin["disposition"], coin["sold_price_cents"], coin["sold_venue"]) == (
+        "sold",
+        25000,
+        "eBay",
+    )
+    detail = json.loads(
+        ledger.conn.execute(
+            "SELECT detail FROM events WHERE event_type='disposition' ORDER BY id DESC LIMIT 1"
+        ).fetchone()["detail"]
+    )
+    assert detail == {
+        "from": "owned",
+        "to": "sold",
+        "sold": {"date": "2026-08-01", "price_cents": 25000, "venue": "eBay"},
+    }
+
+
+def test_set_disposition_revert_clears_sold_fields(ledger):
+    accession = ledger.add_coin()
+    ledger.set_disposition(accession, "sold", sold_price_cents=1234, sold_venue="here")
+    coin = ledger.set_disposition(accession, "owned")
+    assert coin["disposition"] == "owned"
+    assert coin["sold_price_cents"] is None
+    assert coin["sold_venue"] is None
+
+
+def test_set_disposition_validates_enum(ledger):
+    accession = ledger.add_coin()
+    with pytest.raises(ValueError, match="invalid disposition"):
+        ledger.set_disposition(accession, "trashed")
+
+
+def test_find_coins_filters_by_disposition(ledger):
+    a = ledger.add_coin(series="Morgan Dollar")
+    b = ledger.add_coin(series="Peace Dollar")
+    ledger.set_disposition(a, "for_sale")
+    owned = ledger.find_coins(disposition="owned")
+    listed = ledger.find_coins(disposition="for_sale")
+    assert [c["accession_no"] for c in owned] == [b]
+    assert [c["accession_no"] for c in listed] == [a]
