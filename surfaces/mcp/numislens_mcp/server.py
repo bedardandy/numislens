@@ -229,6 +229,138 @@ async def move_coin(accession: str, location_id: int) -> str:
 
 
 @mcp.tool(
+    name="edit_coin",
+    annotations={
+        "title": "Edit Coin",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def edit_coin(
+    accession: str,
+    series: Optional[str] = None,
+    year: Optional[int] = None,
+    mintmark: Optional[str] = None,
+    denomination: Optional[str] = None,
+    country: Optional[str] = None,
+    composition_id: Optional[int] = None,
+    weight_g: Optional[float] = None,
+    diameter_mm: Optional[float] = None,
+    tpg_cert: Optional[str] = None,
+    cost_basis_cents: Optional[int] = None,
+    acquired_date: Optional[str] = None,
+    acquired_source: Optional[str] = None,
+    value_est_cents: Optional[int] = None,
+    value_basis: Optional[str] = None,
+    appraisal_confidence: Optional[float] = None,
+    location_id: Optional[int] = None,
+    notes: Optional[str] = None,
+) -> str:
+    """Correct a coin's record. Omit fields you are not changing.
+
+    Every change is event-logged with its before/after value in the append-only
+    history — corrections are never silent overwrites. Money is INTEGER CENTS
+    (``5000`` = $50). Grade is deliberately NOT editable here: grade changes go
+    through ``record_appraisal`` so provenance stays append-only. Returns the
+    changed-field diff plus the updated coin.
+    """
+    try:
+        body = _body(
+            series=series,
+            year=year,
+            mintmark=mintmark,
+            denomination=denomination,
+            country=country,
+            composition_id=composition_id,
+            weight_g=weight_g,
+            diameter_mm=diameter_mm,
+            tpg_cert=tpg_cert,
+            cost_basis_cents=cost_basis_cents,
+            acquired_date=acquired_date,
+            acquired_source=acquired_source,
+            value_est_cents=value_est_cents,
+            value_basis=value_basis,
+            appraisal_confidence=appraisal_confidence,
+            location_id=location_id,
+            notes=notes,
+        )
+        if not body:
+            return "Error: provide at least one field to edit"
+        result = await _client().request_json(
+            "PUT", f"/api/v1/coins/{accession}", json=body
+        )
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="set_disposition",
+    annotations={
+        "title": "Set Disposition",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def set_disposition(
+    accession: str,
+    disposition: str,
+    sold_date: Optional[str] = None,
+    sold_price_cents: Optional[int] = None,
+    sold_venue: Optional[str] = None,
+) -> str:
+    """Move a coin through its lifecycle: owned -> for_sale -> sold/discarded.
+
+    Marking 'sold' REQUIRES ``sold_price_cents`` (integer cents; 0 is a valid
+    giveaway — a real outcome, not an unknown). Date and venue are optional.
+    Non-sold states clear any recorded sale facts. Every transition lands in
+    the audit trail. Returns the updated coin record.
+    """
+    try:
+        result = await _client().request_json(
+            "POST",
+            f"/api/v1/coins/{accession}/disposition",
+            json=_body(
+                disposition=disposition,
+                sold_date=sold_date,
+                sold_price_cents=sold_price_cents,
+                sold_venue=sold_venue,
+            ),
+        )
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
+    name="find_duplicates",
+    annotations={
+        "title": "Find Duplicates",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def find_duplicates() -> str:
+    """Surface suspect double entries: coins sharing series+year+mintmark.
+
+    Read-only triage for inherited collections — double entries are extremely
+    common when a large collection is inventoried quickly. Adjudication is
+    human work; this only lists suspects with their locations.
+    """
+    try:
+        result = await _client().request_json("GET", "/api/v1/duplicates")
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
     name="locate_coin",
     annotations={
         "title": "Locate Coin",

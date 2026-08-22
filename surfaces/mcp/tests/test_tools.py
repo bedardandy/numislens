@@ -585,3 +585,77 @@ async def test_get_wantlist_pdf_writes_file(tmp_path) -> None:
     assert out_file.exists()
     assert out_file.read_bytes() == pdf_bytes
     assert result.startswith("Saved want-list PDF to")
+
+
+async def test_edit_coin_sends_only_provided_fields() -> None:
+    from numislens_mcp.server import edit_coin
+
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.put("/api/v1/coins/NL-000001").mock(
+            return_value=Response(200, json={"changed": {"year": [1921, 1922]}})
+        )
+        out = await edit_coin("NL-000001", year=1922, notes="corrected")
+        assert "changed" in json.loads(out)
+        sent = json.loads(route.calls.last.request.content)
+        assert sent == {"year": 1922, "notes": "corrected"}
+
+
+async def test_edit_coin_empty_body_is_a_local_error() -> None:
+    from numislens_mcp.server import edit_coin
+
+    with respx.mock(base_url="http://testserver", assert_all_called=False) as mock:
+        mock.put("/api/v1/coins/NL-000001").mock(return_value=Response(200, json={}))
+        out = await edit_coin("NL-000001")
+        assert out.startswith("Error:")
+        assert not any(r.called for r in mock.routes)
+
+
+async def test_edit_coin_rejects_grade_via_api_error_path() -> None:
+    # Grade is not an edit_coin parameter at all (invariant 2); the daemon
+    # schema would also reject it — here we just prove the error path formats.
+    from numislens_mcp.server import edit_coin
+
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.put("/api/v1/coins/NL-000001").mock(
+            return_value=Response(422, json={"detail": "not editable fields"})
+        )
+        out = await edit_coin("NL-000001", year=1900)
+        assert "Error:" in out
+        assert route.called
+
+
+async def test_set_disposition_sold_requires_price_field() -> None:
+    from numislens_mcp.server import set_disposition
+
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.post("/api/v1/coins/NL-000001/disposition").mock(
+            return_value=Response(200, json={"disposition": "sold"})
+        )
+        await set_disposition(
+            "NL-000001",
+            disposition="sold",
+            sold_price_cents=12500,
+            sold_date="2026-08-22",
+        )
+        sent = json.loads(route.calls.last.request.content)
+        assert sent == {
+            "disposition": "sold",
+            "sold_date": "2026-08-22",
+            "sold_price_cents": 12500,
+        }
+
+
+async def test_find_duplicates_returns_groups() -> None:
+    from numislens_mcp.server import find_duplicates
+
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.get("/api/v1/duplicates").mock(
+            return_value=Response(
+                200,
+                json=[{"series": "Peace Dollar", "year": 1922, "count": 2}],
+            )
+        )
+        out = await find_duplicates()
+        data = json.loads(out)
+        assert data[0]["count"] == 2
+        assert route.called
