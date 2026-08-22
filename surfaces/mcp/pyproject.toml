@@ -9,7 +9,8 @@ description = "NumisLens MCP server (Model Context Protocol) over the REST daemo
 requires-python = ">=3.10"
 license = {text = "GPL-3.0-or-later"}
 dependencies = [
-    "mcp[cli]",
+    # mcp<2: the 2.x SDK removed mcp.server.fastmcp, which this server imports.
+    "mcp[cli]>=1.8,<2",
     "httpx",
     # identify_coin runs the Phase-4 pipeline in-process. Install the local
     # package into this venv: pip install -e vision (see ops/README.md).

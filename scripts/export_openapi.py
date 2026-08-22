@@ -17,6 +17,9 @@ Sanity assertions (fail loud): every path is under ``/api/v1``, the expected
 count is present (20 original routes + quick-add = 21 unique templates... see
 EXPECTED_PATHS below), quick-add is present, and every operation carries the
 bearer requirement.
+
+``--check`` regenerates in memory, diffs against the committed artifact, and
+exits non-zero on drift (CI mode — it never writes the file).
 """
 
 from __future__ import annotations
@@ -110,8 +113,31 @@ def assert_spec(spec: dict) -> None:
 def main() -> int:
     spec = build_spec()
     assert_spec(spec)
+    serialized = json.dumps(spec, indent=2, ensure_ascii=False) + "\n"
+
+    # --check: CI mode. Regenerate in memory and compare against the committed
+    # artifact; exit non-zero on drift instead of rewriting the file.
+    if "--check" in sys.argv[1:]:
+        try:
+            current = OUTPUT.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            current = None
+        if current != serialized:
+            print(
+                f"{OUTPUT.relative_to(REPO_ROOT)} is stale relative to the "
+                "daemon's routes/schemas — regenerate it with: "
+                "python3 scripts/export_openapi.py",
+                file=sys.stderr,
+            )
+            return 1
+        print(
+            f"ok: {OUTPUT.relative_to(REPO_ROOT)} matches the daemon — "
+            f"{len(spec['paths'])} paths, all /api/v1 secured with bearerAuth"
+        )
+        return 0
+
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    OUTPUT.write_text(serialized, encoding="utf-8")
     print(
         f"wrote {OUTPUT.relative_to(REPO_ROOT)} — "
         f"{len(spec['paths'])} paths, all /api/v1 secured with bearerAuth"
