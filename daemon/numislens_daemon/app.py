@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from numislens_core.db import init_db
 
 from .auth import require_token
 from .config import Settings, resolve_token
@@ -39,6 +40,10 @@ def create_app(
     app.state.numislens_token = token
     app.state.db_path = str(db_path)
     app.state.images_dir = images_dir or Settings(db_path=db_path).images_dir
+
+    # Migrate ONCE at startup. Per-request Ledger connections (deps.get_ledger)
+    # open with migrate=False so no request re-scans migrations.
+    init_db(str(db_path))
 
     router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_token)])
 

@@ -6,7 +6,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
-from .db import init_db
+from .db import connect, init_db
 from .manifests import load_manifest
 
 GRADE_BUCKETS = frozenset({"AG", "G", "VG", "F", "VF", "XF", "AU", "UNC", "PROOF"})
@@ -79,8 +79,12 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
 
 
 class Ledger:
-    def __init__(self, path) -> None:
-        self.conn = init_db(path)
+    def __init__(self, path, *, migrate: bool = True) -> None:
+        # migrate=True runs the (idempotent) migration scan on open. Long-lived
+        # callers that have already migrated the database once — the daemon
+        # does it at startup in create_app() — pass migrate=False so a fresh
+        # connection per request doesn't re-scan migrations every time.
+        self.conn = init_db(path) if migrate else connect(path)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
 

@@ -9,7 +9,9 @@ from numislens_core import Ledger
 
 
 def get_ledger(request: Request) -> Generator[Ledger, None, None]:
-    ldb = Ledger(request.app.state.db_path)
+    # create_app() migrated the database once at startup; skip the per-request
+    # migration scan here.
+    ldb = Ledger(request.app.state.db_path, migrate=False)
     ldb.conn.execute("PRAGMA busy_timeout = 5000")
     try:
         yield ldb
