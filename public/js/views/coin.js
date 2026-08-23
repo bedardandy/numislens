@@ -170,7 +170,6 @@ export async function renderCoin(el, accession) {
   addDetailRow(dl, 'Grade source', coin.grade_source);
   addDetailRow(dl, 'TPG cert', coin.tpg_cert);
   addDetailRow(dl, 'Cost basis', coin.cost_basis_display);
-  // Phase 3a: full appraisal history is not exposed by the API; only latest value fields below.
   addDetailRow(dl, 'Estimated value', coin.value_est_display);
   addDetailRow(dl, 'Value basis', coin.value_basis);
   addDetailRow(dl, 'Appraisal confidence', coin.appraisal_confidence);
@@ -404,4 +403,59 @@ export async function renderCoin(el, accession) {
   }
 
   el.appendChild(dispositionSection);
+
+  // --- Appraisal history (append-only trail, newest first) ----------------
+  const appraisals = Array.isArray(coin.appraisals) ? coin.appraisals : [];
+  if (appraisals.length) {
+    const h = document.createElement('h3');
+    h.textContent = 'Appraisal history';
+    el.appendChild(h);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+    const table = document.createElement('table');
+    table.className = 'coin-table';
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    for (const label of ['When', 'By', 'Grade', 'Value', 'Confidence', 'Rationale']) {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = label;
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (const a of appraisals) {
+      const tr = document.createElement('tr');
+      for (const text of [
+        display(a.appraised_at),
+        display(a.appraised_by),
+        display(a.grade_bucket),
+        a.value_cents != null ? formatCents(a.value_cents) : EM_DASH,
+        a.confidence != null ? String(a.confidence) : EM_DASH,
+        display(a.rationale),
+      ]) {
+        const td = document.createElement('td');
+        td.textContent = text;
+        tr.appendChild(td);
+      }
+      if (a.source_url) {
+        // Provenance link: the citation lives in the record, surface it.
+        const lastTd = tr.lastElementChild;
+        const link = document.createElement('a');
+        link.href = a.source_url;
+        link.textContent = ' source';
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        lastTd.appendChild(link);
+        tr.title = 'Source: ' + a.source_url;
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    el.appendChild(wrap);
+  }
 }

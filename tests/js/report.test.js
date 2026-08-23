@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { formatCents } from '../../public/js/money.js';
 import {
   realizedLines,
+  worklistRowCells,
+  referenceSourceLines,
   basisLabel,
   metalName,
   formatYearMint,
@@ -203,4 +205,39 @@ test('realizedLines omits disclosure when every sale has a cost basis', () => {
   });
   assert.equal(lines.length, 1);
   assert.match(lines[0], /realized −\$1\.00/);
+});
+
+test('worklistRowCells shapes identity rows with gap formatting', () => {
+  const cells = worklistRowCells({
+    accession_no: 'NL-000007',
+    identity: 'Washington Quarter 1932D',
+    grade_bucket: null,
+    current_best_cents: 25,
+    potential_cents: 350000,
+    gap_cents: 349975,
+  });
+  assert.deepEqual(cells, [
+    'NL-000007',
+    'Washington Quarter 1932D',
+    EM_DASH,
+    '$0.25',
+    '$3,500.00',
+    '+$3,499.75',
+  ]);
+});
+
+test('referenceSourceLines renders provenance per dataset', () => {
+  assert.deepEqual(referenceSourceLines(null), []);
+  const lines = referenceSourceLines([
+    {
+      name: 'Wheat keys',
+      source: {
+        name: 'PCGS (retail)',
+        url: 'https://www.pcgs.com/prices',
+        retrieved: '2026-08-01',
+      },
+    },
+  ]);
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /Wheat keys — PCGS \(retail\), retrieved 2026-08-01 \(https:\/\/www\.pcgs\.com\/prices\)/);
 });

@@ -10,6 +10,7 @@ const METAL_NAMES = { XAG: 'Silver', XAU: 'Gold', XPT: 'Platinum' };
 
 const BASIS_LABELS = {
   collectible: 'Collectible',
+  reference: 'Reference',
   melt: 'Melt',
   face: 'Face',
   best: 'Best',
@@ -61,6 +62,35 @@ export function highlightSecondary(h) {
   if (h == null) return null;
   if (h.melt_cents == null || h.collectible_cents == null) return null;
   return `Melt ${formatCents(h.melt_cents)} ${MIDDOT} Collectible ${formatCents(h.collectible_cents)}`;
+}
+
+/**
+ * One row of the appraisal worklist table: accession link text, identity,
+ * grade, current best, potential, gap. Pure — exported for tests.
+ */
+export function worklistRowCells(w) {
+  const grade = w.grade_bucket ? `[${w.grade_bucket}]` : EM_DASH;
+  return [
+    display(w.accession_no),
+    display(w.identity),
+    grade,
+    formatCents(w.current_best_cents),
+    formatCents(w.potential_cents),
+    formatGainLoss(w.gap_cents).display,
+  ];
+}
+
+/**
+ * Provenance footnote lines for the reference datasets that informed a
+ * report: "name — Source Name, retrieved YYYY-MM-DD (url)". Pure — exported
+ * for tests.
+ */
+export function referenceSourceLines(references) {
+  if (!Array.isArray(references)) return [];
+  return references.map((r) => {
+    const s = r.source || {};
+    return `${display(r.name)} — ${display(s.name)}, retrieved ${display(s.retrieved)} (${display(s.url)})`;
+  });
 }
 
 /** Filename-safe date (YYYY-MM-DD) from an ISO timestamp, else today (UTC). */
@@ -323,6 +353,30 @@ function buildFooter(report) {
   gen.textContent = `Generated ${display(report.generated_at)} ${MIDDOT} top ${display(report.top_n)}`;
   footer.appendChild(gen);
 
+  // Curated reference datasets that informed this run — every non-melt
+  // figure traces to a cited input.
+  const refLines = referenceSourceLines(report.references);
+  if (refLines.length) {
+    const refHeading = document.createElement('p');
+    refHeading.textContent = 'Reference data:';
+    refHeading.style.fontWeight = '600';
+    footer.appendChild(refHeading);
+    const refList = document.createElement('ul');
+    refList.className = 'melt-by-metal';
+    for (const line of refLines) {
+      const li = document.createElement('li');
+      li.textContent = line;
+      refList.appendChild(li);
+    }
+    footer.appendChild(refList);
+    const refNote = document.createElement('p');
+    refNote.className = 'muted';
+    refNote.textContent =
+      'Reference figures are retail-guide ballparks for triage — verify ' +
+      'before any sale. They are never written onto coins.';
+    footer.appendChild(refNote);
+  }
+
   const dq = report.data_quality || {};
   const notes = [];
   if (dq.stale_count) {
@@ -499,6 +553,67 @@ export async function renderReport(el) {
       hHeading.textContent = 'Top highlights';
       content.appendChild(hHeading);
       content.appendChild(buildHighlightsTable(highlights));
+    }
+
+    // --- Appraisal worklist ------------------------------------------------
+    const worklist = Array.isArray(report.worklist) ? report.worklist : [];
+    if (worklist.length) {
+      const wHeading = document.createElement('h3');
+      wHeading.textContent = 'Appraisal worklist — what deserves eyes first';
+      content.appendChild(wHeading);
+      const wNote = document.createElement('p');
+      wNote.className = 'muted';
+      wNote.textContent =
+        'Identities flagged by the curated reference data (key dates etc.) ' +
+        'whose current value falls short. Potential is the identity\u2019s top ' +
+        'catalog level \u2014 an attention signal from cited data, not a promise; ' +
+        'grade decides where a coin actually lands.';
+      content.appendChild(wNote);
+
+      const wWrap = document.createElement('div');
+      wWrap.className = 'table-wrap';
+      const wTable = document.createElement('table');
+      wTable.className = 'coin-table';
+      const wHead = document.createElement('thead');
+      const wHeadRow = document.createElement('tr');
+      for (const label of ['Accession', 'Identity', 'Grade', 'Now', 'Potential', 'Gap']) {
+        const th = document.createElement('th');
+        th.scope = 'col';
+        th.textContent = label;
+        wHeadRow.appendChild(th);
+      }
+      wHead.appendChild(wHeadRow);
+      wTable.appendChild(wHead);
+      const wBody = document.createElement('tbody');
+      for (const w of worklist) {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        const acc = w.accession_no;
+        tr.addEventListener('click', () => { window.location.hash = `#/coin/${encodeURIComponent(acc)}`; });
+        const cells = worklistRowCells(w);
+        cells.forEach((cell, idx) => {
+          const td = document.createElement('td');
+          if (idx === 0) {
+            const link = document.createElement('a');
+            link.href = `#/coin/${encodeURIComponent(acc)}`;
+            link.textContent = cell;
+            link.addEventListener('click', (e) => e.stopPropagation());
+            td.appendChild(link);
+          } else {
+            td.textContent = cell;
+          }
+          if (idx === 5) {
+            const tone = w.gap_cents > 0 ? 'var(--color-success)' : '';
+            if (tone) td.style.color = tone;
+          }
+          tr.appendChild(td);
+        });
+        if (w.location_path) tr.title = 'Location: ' + w.location_path;
+        wBody.appendChild(tr);
+      }
+      wTable.appendChild(wBody);
+      wWrap.appendChild(wTable);
+      content.appendChild(wWrap);
     }
 
     // --- Groups -----------------------------------------------------------
