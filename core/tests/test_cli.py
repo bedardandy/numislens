@@ -263,3 +263,26 @@ def test_watch_status_json(tmp_path, capsys):
     data = json.loads(out)
     assert data["stale_count"] == 0
     assert len(data["watchlist"]) == 1
+
+
+def test_worklist_json(tmp_path, capsys):
+    db = tmp_path / "cli.db"
+    cli.main(["--db", str(db), "init"])
+    capsys.readouterr()
+    cli.main(
+        ["--db", str(db), "add", "--series", "Washington Quarter",
+         "--year", "1932", "--mint", "D", "--denomination", "quarter"]
+    )
+    capsys.readouterr()
+
+    rc = cli.main(["--db", str(db), "worklist", "--json"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    assert data[0]["identity"] == "Washington Quarter 1932D"
+
+    rc = cli.main(["--db", str(db), "worklist"])
+    assert rc == 0
+    text, _ = capsys.readouterr()
+    assert "Washington Quarter 1932D" in text
+    assert "1 coin(s) flagged" in text

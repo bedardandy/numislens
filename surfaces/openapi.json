@@ -1652,6 +1652,62 @@
         ]
       }
     },
+    "/api/v1/worklist": {
+      "get": {
+        "tags": [
+          "report"
+        ],
+        "summary": "Worklist",
+        "description": "The 'what deserves eyes first' appraisal worklist.\n\nOwned coins whose identity matches a notable entry in the curated\nreference data (a key date, say) but whose current best value falls\nshort of it — sorted by the gap. potential_cents is an attention\nsignal from cited data, never a written value; grade determines where\na given coin actually lands.",
+        "operationId": "worklist_api_v1_worklist_get",
+        "parameters": [
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Top"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Worklist Api V1 Worklist Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/portfolio/realized": {
       "get": {
         "tags": [

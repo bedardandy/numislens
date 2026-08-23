@@ -13,6 +13,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from . import melt
+from .reference import ReferenceSet, load_references
 
 # US face values in cents, keyed by lowercased denomination. US coins only.
 FACE_CENTS = {
@@ -97,8 +98,23 @@ def _location_path(loc_map: dict[int, tuple[int | None, str]], location_id: int 
     return " > ".join(labels)
 
 
-def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
-    """Whole-portfolio appraisal rollup. Pure read -- writes nothing anywhere."""
+def build_appraisal_report(
+    conn: sqlite3.Connection,
+    top_n: int = 10,
+    references: ReferenceSet | None = None,
+) -> dict:
+    """Whole-portfolio appraisal rollup. Pure read -- writes nothing anywhere.
+
+    ``references`` (loaded from core/reference when None) adds a fourth
+    valuation candidate: the curated, source-cited REFERENCE basis. It is
+    applied at READ time only — never written to coins — via exact-match
+    lookups (series + year + mintmark + grade bucket, no interpolation).
+    The report also carries an appraisal WORKLIST: owned coins whose
+    identity matches a notable reference entry but whose current best value
+    falls short of it — the "what deserves eyes first" triage list.
+    """
+    if references is None:
+        references = load_references()
     coins = conn.execute(
         """
         SELECT
@@ -115,6 +131,7 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
             c.value_est_cents AS value_est_cents,
             c.value_basis AS value_basis,
             c.stale_since AS stale_since,
+            c.disposition AS disposition,
             c.location_id AS location_id,
             c.composition_id AS composition_id,
             comp.metal AS metal,
@@ -183,6 +200,7 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
     unvalued_count = 0
     best_total = 0
     collectible_total = 0
+    reference_total = 0
     melt_total = 0
     face_total = 0
     cost_basis_total = 0
@@ -193,6 +211,7 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
     # Breakdown: each valued coin lands in exactly one bucket by winning basis.
     bucket = {
         "collectible": {"count": 0, "total_cents": 0},
+        "reference": {"count": 0, "total_cents": 0},
         "melt": {"count": 0, "total_cents": 0},
         "face": {"count": 0, "total_cents": 0},
     }
@@ -230,14 +249,25 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
             collectible_cents = value_est
             basis_unspecified_count += 1
 
+        # --- reference: curated cited data, exact match on the full identity
+        # including grade bucket. Read-time only; a miss is simply no data.
+        reference_cents: int | None = None
+        if row["series"] and row["year"] is not None and row["country"] == "US":
+            reference_cents = references.lookup(
+                row["series"], row["year"], row["mintmark"], row["grade_bucket"]
+            )
+
         # --- face.
         face_cents = face_value_cents(row["denomination"], row["country"])
 
         # --- best: max of the non-None candidates; ties broken by priority
-        # collectible (3) > melt (2) > face (1).
+        # collectible (4) > reference (3) > melt (2) > face (1). A human or
+        # vision appraisal outranks a retail-guide row at equal money.
         candidates: list[tuple[int, int, str]] = []
         if collectible_cents is not None:
-            candidates.append((collectible_cents, 3, "collectible"))
+            candidates.append((collectible_cents, 4, "collectible"))
+        if reference_cents is not None:
+            candidates.append((reference_cents, 3, "reference"))
         if melt_cents is not None:
             candidates.append((melt_cents, 2, "melt"))
         if face_cents is not None:
@@ -257,6 +287,8 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
         # Component totals (summed wherever each component is present).
         if collectible_cents is not None:
             collectible_total += collectible_cents
+        if reference_cents is not None:
+            reference_total += reference_cents
         if melt_cents is not None:
             melt_total += melt_cents
         if face_cents is not None:
@@ -309,6 +341,7 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
                     "best_basis": best_basis,
                     "melt_cents": melt_cents,
                     "collectible_cents": collectible_cents,
+                    "reference_cents": reference_cents,
                     "face_cents": face_cents,
                     "location_path": _location_path(loc_map, row["location_id"]),
                 }
@@ -412,16 +445,54 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
     ]
     metals_out.sort(key=lambda g: (-g["value_cents"], g["metal"]))
 
+    # --- Appraisal worklist: owned coins whose IDENTITY is flagged notable by
+    # the reference data but whose current best value falls short. This is the
+    # "what deserves eyes first" triage list — the inheritor's answer to
+    # 'which of these 400 coins should I actually look at?'. potential_cents
+    # is the identity's top catalog level (grade determines where a given
+    # coin lands within it); it is an attention signal, never a value.
+    worklist: list[dict] = []
+    for row in coins:
+        if row["disposition"] in ("sold", "discarded"):
+            continue
+        if not row["series"] or row["year"] is None:
+            continue
+        attention = references.notable_value(
+            row["series"], row["year"], row["mintmark"]
+        )
+        if attention is None:
+            continue
+        current_best = best_by_id.get(row["id"], 0)
+        gap = attention - current_best
+        if gap <= 0:
+            continue
+        mint = row["mintmark"] or ""
+        worklist.append(
+            {
+                "accession_no": row["accession_no"],
+                "identity": f"{row['series']} {row['year']}{mint}",
+                "grade_bucket": row["grade_bucket"],
+                "current_best_cents": current_best,
+                "potential_cents": attention,
+                "gap_cents": gap,
+                "location_path": _location_path(loc_map, row["location_id"]),
+            }
+        )
+    worklist.sort(key=lambda w: (-w["gap_cents"], w["accession_no"]))
+    worklist = worklist[:top_n]
+
     return {
         "generated_at": _utcnow(),
         "top_n": top_n,
         "spot": spot,
+        "references": references.sources(),
         "totals": {
             "coin_count": coin_count,
             "valued_count": valued_count,
             "unvalued_count": unvalued_count,
             "best_total_cents": best_total,
             "collectible_total_cents": collectible_total,
+            "reference_total_cents": reference_total,
             "melt_total_cents": melt_total,
             "face_total_cents": face_total,
             "cost_basis_total_cents": cost_basis_total,
@@ -437,11 +508,13 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
         },
         "breakdown": {
             "collectible": bucket["collectible"],
+            "reference": bucket["reference"],
             "melt": bucket["melt"],
             "face": bucket["face"],
             "unvalued": {"count": unvalued_count},
         },
         "highlights": highlights,
+        "worklist": worklist,
         "groups": {
             "sets": sets_out,
             "mints": mints_out,
@@ -459,3 +532,18 @@ def build_appraisal_report(conn: sqlite3.Connection, top_n: int = 10) -> dict:
         },
         "realized": realized_summary(conn),
     }
+
+
+def appraisal_worklist(
+    conn: sqlite3.Connection,
+    top_n: int = 20,
+    references: ReferenceSet | None = None,
+) -> list[dict]:
+    """The 'what deserves eyes first' list, standalone.
+
+    Thin wrapper over :func:`build_appraisal_report` so the worklist has
+    exactly one implementation (it needs the same best-value computation the
+    full rollup performs). Returns ``report["worklist"]``.
+    """
+    report = build_appraisal_report(conn, top_n=top_n, references=references)
+    return report["worklist"]

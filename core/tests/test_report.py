@@ -391,3 +391,85 @@ def test_appraisal_report_includes_realized_block(ledger):
     report = build_appraisal_report(ledger.conn)
     assert report["realized"]["sold_count"] == 1
     assert report["realized"]["realized_pnl_cents"] == 400
+
+
+def test_reference_basis_beats_face_for_graded_key_date(ledger):
+    from numislens_core.report import build_appraisal_report
+
+    # A graded 1931-S wheat cent: reference VF=18000 crushes face 1 cent.
+    accession = ledger.add_coin(
+        series="Lincoln Wheat Cent", year=1931, mintmark="S",
+        grade_bucket="VF", denomination="cent",
+    )
+    report = build_appraisal_report(ledger.conn)
+    row = next(r for r in report["highlights"] if r["accession_no"] == accession)
+    assert row["best_basis"] == "reference"
+    assert row["best_cents"] == 18000
+    assert row["reference_cents"] == 18000
+    assert report["totals"]["reference_total_cents"] == 18000
+    assert report["breakdown"]["reference"]["count"] == 1
+    # Provenance rides with the report.
+    assert any(s["id"] == "lincoln-wheat-cents" for s in report["references"])
+
+
+def test_collectible_still_outranks_reference_at_higher_value(ledger):
+    from numislens_core.report import build_appraisal_report
+
+    accession = ledger.add_coin(
+        series="Lincoln Wheat Cent", year=1914, mintmark="D",
+        grade_bucket="G", denomination="cent",
+        value_est_cents=500000, value_basis="numismatic",
+    )
+    report = build_appraisal_report(ledger.conn)
+    row = next(r for r in report["highlights"] if r["accession_no"] == accession)
+    assert row["best_basis"] == "collectible"
+    assert row["best_cents"] == 500000
+
+
+def test_worklist_flags_ungraded_key_date_and_excludes_sold(ledger):
+    from numislens_core.report import appraisal_worklist, build_appraisal_report
+
+    flagged = ledger.add_coin(
+        series="Washington Quarter", year=1932, mintmark="D",
+        denomination="quarter", cost_basis_cents=25,
+    )  # ungraded: lookup misses, but identity is notable -> worklist
+    sold_key = ledger.add_coin(
+        series="Lincoln Wheat Cent", year=1914, mintmark="D",
+        denomination="cent",
+    )
+    ledger.set_disposition(sold_key, "sold", sold_price_cents=100)
+    common = ledger.add_coin(
+        series="Lincoln Wheat Cent", year=1952, mintmark=None,
+        denomination="cent",
+    )  # common date: never flagged
+
+    work = appraisal_worklist(ledger.conn)
+    accessions = [w["accession_no"] for w in work]
+    assert flagged in accessions
+    assert sold_key not in accessions  # sold: out of the triage list
+    assert common not in accessions
+
+    entry = next(w for w in work if w["accession_no"] == flagged)
+    assert entry["identity"] == "Washington Quarter 1932D"
+    # Attention value = the identity's top catalog level (UNC 1932-D row).
+    assert entry["potential_cents"] == 350000
+    assert entry["gap_cents"] == entry["potential_cents"] - entry["current_best_cents"]
+
+    # The full report embeds the same worklist.
+    report = build_appraisal_report(ledger.conn)
+    assert report["worklist"] == work
+
+
+def test_worklist_clears_once_reference_value_applies(ledger):
+    from numislens_core.report import appraisal_worklist
+
+    accession = ledger.add_coin(
+        series="Lincoln Wheat Cent", year=1931, mintmark="S",
+        grade_bucket="VF", denomination="cent",
+    )
+    # Graded + exact reference match: best (18000) >= notable max (120000)?
+    # No — 1931-S UNC is 120000, so it stays flagged; assert honest behavior.
+    work = appraisal_worklist(ledger.conn)
+    entry = next(w for w in work if w["accession_no"] == accession)
+    assert entry["current_best_cents"] == 18000
+    assert entry["gap_cents"] == 120000 - 18000

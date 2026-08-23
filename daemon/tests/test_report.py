@@ -157,3 +157,32 @@ def test_report_json_empty_db_zeroed(client, auth_headers) -> None:
     assert body["totals"]["gain_loss_cents"] == 0
     assert body["highlights"] == []
     assert body["spot"] == {}
+
+
+def test_worklist_endpoint_flags_key_dates(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    make_coin({
+        "series": "Washington Quarter", "year": 1932, "mintmark": "D",
+        "denomination": "quarter",
+    })
+    response = client.get("/api/v1/worklist?top=10", headers=auth_headers)
+    assert response.status_code == 200
+    items = response.json()
+    assert len(items) == 1
+    assert items[0]["identity"] == "Washington Quarter 1932D"
+    assert items[0]["potential_cents"] == 350000
+
+
+def test_appraisal_report_includes_reference_provenance(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.get("/api/v1/report/appraisal", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert isinstance(body["references"], list)
+    assert any(s["id"] == "lincoln-wheat-cents" for s in body["references"])
+    assert "worklist" in body

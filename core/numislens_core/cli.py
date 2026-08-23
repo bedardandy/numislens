@@ -10,6 +10,7 @@ from pathlib import Path
 
 from . import ledger, melt
 from .money import parse_dollars_to_cents
+from .report import appraisal_worklist
 
 
 def resolve_db_path(args_db: str | None) -> Path:
@@ -406,6 +407,33 @@ def _coin_line(coin: dict) -> str:
 
 
 @_cmd_error
+def cmd_worklist(path: Path, args: argparse.Namespace) -> int:
+    ldb = _open_ledger(path)
+    try:
+        items = appraisal_worklist(ldb.conn, top_n=args.n)
+        if args.json:
+            print(json.dumps(items, indent=2, default=str))
+            return 0
+        if not items:
+            print("worklist is empty — nothing flagged by the reference data")
+            return 0
+        for item in items:
+            current = _dollars(item["current_best_cents"])
+            potential = _dollars(item["potential_cents"])
+            grade = item.get("grade_bucket") or "?"
+            loc = f" @ {item['location_path']}" if item.get("location_path") else ""
+            print(
+                f"{item['accession_no']}  {item['identity']}  [{grade}]  "
+                f"now {current}  potential {potential}  "
+                f"gap {_dollars(item['gap_cents'])}{loc}"
+            )
+        print(f"{len(items)} coin(s) flagged")
+    finally:
+        ldb.close()
+    return 0
+
+
+@_cmd_error
 def cmd_watch_status(path: Path, args: argparse.Namespace) -> int:
     ldb = _open_ledger(path)
     try:
@@ -574,6 +602,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     watch_mark_p.add_argument("--reason", required=True)
 
+    worklist_p = subparsers.add_parser(
+        "worklist", help="Coins the reference data flags for appraisal attention"
+    )
+    worklist_p.add_argument("--n", type=int, default=20, help="max entries")
+    worklist_p.add_argument("--json", action="store_true")
+
     return parser
 
 
@@ -618,6 +652,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_watch_stale(path, args)
         if args.watch_command == "mark":
             return cmd_watch_mark(path, args)
+    if args.command == "worklist":
+        return cmd_worklist(path, args)
 
     parser.error(f"unknown command: {args.command}")
     return 1

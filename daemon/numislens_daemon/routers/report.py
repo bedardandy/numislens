@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
 from numislens_core import Ledger, build_appraisal_report
-from numislens_core.report import realized_summary
+from numislens_core.report import appraisal_worklist, realized_summary
 
 from ..deps import get_ledger
 from ..report_pdf import render_appraisal_pdf
@@ -23,6 +23,19 @@ TopParam = Annotated[int, Query(ge=1, le=100)]
 def appraisal_json(ldb: LedgerDep, top: TopParam = 10) -> dict:
     # Verbatim core dict: all money is integer cents; the PWA formats client-side.
     return build_appraisal_report(ldb.conn, top_n=top)
+
+
+@router.get("/worklist", tags=["report"])
+def worklist(ldb: LedgerDep, top: TopParam = 20) -> list[dict]:
+    """The 'what deserves eyes first' appraisal worklist.
+
+    Owned coins whose identity matches a notable entry in the curated
+    reference data (a key date, say) but whose current best value falls
+    short of it — sorted by the gap. potential_cents is an attention
+    signal from cited data, never a written value; grade determines where
+    a given coin actually lands.
+    """
+    return appraisal_worklist(ldb.conn, top_n=top)
 
 
 @router.get("/portfolio/realized", tags=["report"])
