@@ -34,7 +34,8 @@ Melt fetching is keyless and fail-loud: it never fabricates a price and exits no
 - **Add with photos**: create a coin and capture obverse / reverse / edge / slab images from the device camera.
 - **Locations**: nest cabinets → boxes → trays → slots (and albums → pages → pockets); every coin lives in exactly one, and moves are recorded as events.
 - **Set-completion boards**: visual album grids per set with filled/gap slot chips, key-date markers, and an assign-coin picker.
-- **Melt dashboard**: deterministic, keyless precious-metal melt values with a dual-source spot cross-check — never fabricated, fail-loud on source disagreement or staleness.
+-   **Melt dashboard**: deterministic, keyless precious-metal melt values with a dual-source spot cross-check — never fabricated, fail-loud on source disagreement or staleness.
+-   **Reference values & appraisal worklist**: curated, source-cited value datasets (wheat-cent keys, the Washington quarter keys melt can't price, Jefferson nickel surprises) apply read-time via exact-match lookups — no interpolation, never written onto coins. The report's worklist answers the inheritor's real question: *which of these 400 coins deserve eyes first?*
 - **Value-watch**: token-efficient, three tiers cheapest-first — daily melt (automatic), a weekly market digest that fans one search out to staleness flags (`/watch/digest`), and a monthly top-value watchlist sweep. Staleness is metadata (it never changes a stored value); a ≥10% spot move auto-flags hybrid/numismatic coins, and an appraisal clears the flag. Optional keyless ntfy push on big moves.
 - **Offline-first**: cached read snapshots (always shown with an OFFLINE banner) and a queue for offline coin moves that replays in order when connectivity returns.
 - **Cycle-count mode**: warehouse-style reconciliation of a location's expected contents against what is physically present, with a copyable report.

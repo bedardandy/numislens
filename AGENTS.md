@@ -30,9 +30,11 @@ numislens/
 │   │   ├── melt.py                # keyless dual-source spot fetch + melt recompute
 │   │   ├── money.py               # exact dollar-string -> integer-cents parser
 │   │   ├── csvio.py               # CSV export/import contract (all-or-nothing)
+│   │   ├── reference.py           # curated cited value data: strict loader, exact-match lookup
 │   │   └── cli.py                 # `numislens` console script
-│   ├── migrations/                # 001_initial … 006_albums (rolls, album imports)
+│   ├── migrations/                # 001_initial … 009_appraisal_source_url
 │   ├── sets/                      # set manifests (JSON) + manifest.schema.json
+│   ├── reference/                 # curated value datasets (cited) + reference.schema.json
 │   └── tests/                     # pytest: cli, ledger, manifests, melt, migrations_smoke
 ├── daemon/                        # FastAPI REST + OpenAPI + bearer auth
 │   ├── numislens_daemon/
@@ -122,6 +124,12 @@ numislens/
     overwrites), and grade set there is legitimate per invariant 2 (a photo
     pipeline is an allowed grade source, tagged via `grade_source`). The gate in
     `vision/gate.py` NEVER emits a guessed value — disagreements escalate.
+12. **Reference values are read-time and cited.** Curated datasets
+    (`core/reference/*.json`, mandatory provenance blocks) feed the report's
+    REFERENCE basis and the appraisal worklist via EXACT-match lookups only —
+    no grade interpolation, MIN across datasets for values, MAX for attention
+    flags. They are never written to `coins`, and grade-null entries are
+    worklist flags, never reported values.
 
 ## Test suites (keep green)
 
