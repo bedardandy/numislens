@@ -527,3 +527,23 @@ def test_duplicates_endpoint(
         1922,
         2,
     )
+
+
+def test_appraise_with_source_url(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+) -> None:
+    acc = make_coin()
+    response = client.post(
+        f"/api/v1/coins/{acc}/appraise",
+        json={
+            "appraised_by": "human",
+            "value_cents": 25000,
+            "source_url": "https://auctions.example/lot/42",
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    detail = client.get(f"/api/v1/coins/{acc}", headers=auth_headers).json()
+    assert detail["appraisals"][0]["source_url"] == "https://auctions.example/lot/42"

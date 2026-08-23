@@ -702,6 +702,7 @@ class Ledger:
         rationale=None,
         token_cost=None,
         confidence=None,
+        source_url=None,
         appraised_at=None,
     ) -> int:
         coin_id = self._coin_id(accession)
@@ -718,8 +719,9 @@ class Ledger:
                 """
                 INSERT INTO appraisals (
                     coin_id, appraised_by, appraised_at, grade_bucket,
-                    value_cents, value_basis, rationale, token_cost, confidence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    value_cents, value_basis, rationale, token_cost, confidence,
+                    source_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     coin_id,
@@ -731,6 +733,7 @@ class Ledger:
                     rationale,
                     token_cost,
                     confidence,
+                    source_url,
                 ),
             )
             appraisal_id = cur.lastrowid

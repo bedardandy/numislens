@@ -18,12 +18,14 @@ from numislens_mcp.server import (
     get_roll_labels_pdf,
     get_wantlist_pdf,
     get_watchlist,
+    get_worklist,
     list_stale,
     locate_coin,
     melt_status,
     melt_update,
     move_coin,
     quick_add,
+    record_appraisal,
     roll_create,
     roll_get,
     roll_pull,
@@ -659,3 +661,34 @@ async def test_find_duplicates_returns_groups() -> None:
         data = json.loads(out)
         assert data[0]["count"] == 2
         assert route.called
+
+
+async def test_get_worklist_passes_top() -> None:
+    from numislens_mcp.server import get_worklist
+
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.get("/api/v1/worklist").mock(
+            return_value=Response(
+                200,
+                json=[{"accession_no": "NL-000001", "gap_cents": 330000}],
+            )
+        )
+        out = await get_worklist(n=5)
+        data = json.loads(out)
+        assert data[0]["gap_cents"] == 330000
+        assert route.calls.last.request.url.params["top"] == "5"
+
+
+async def test_record_appraisal_passes_source_url() -> None:
+    with respx.mock(base_url="http://testserver") as mock:
+        route = mock.post("/api/v1/coins/NL-000001/appraise").mock(
+            return_value=Response(200, json={"appraisal_id": 1})
+        )
+        await record_appraisal(
+            "NL-000001",
+            appraised_by="human",
+            value_cents=25000,
+            source_url="https://auctions.example/lot/42",
+        )
+        sent = json.loads(route.calls.last.request.content)
+        assert sent["source_url"] == "https://auctions.example/lot/42"

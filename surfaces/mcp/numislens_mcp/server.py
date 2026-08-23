@@ -361,6 +361,34 @@ async def find_duplicates() -> str:
 
 
 @mcp.tool(
+    name="get_worklist",
+    annotations={
+        "title": "Get Appraisal Worklist",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def get_worklist(n: int = 20) -> str:
+    """Coins the curated reference data flags for appraisal attention.
+
+    Owned coins whose identity matches a notable entry (a key date, for
+    example) but whose current value falls short of it, sorted by the gap.
+    This is the 'which of these coins deserve eyes first' list. potential
+    values are attention signals from cited data, never written values —
+    grade determines where a given coin actually lands.
+    """
+    try:
+        result = await _client().request_json(
+            "GET", "/api/v1/worklist", params={"top": n}
+        )
+        return _dumps(result)
+    except NumisLensError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool(
     name="locate_coin",
     annotations={
         "title": "Locate Coin",
@@ -605,6 +633,7 @@ async def record_appraisal(
     rationale: Optional[str] = None,
     token_cost: Optional[int] = None,
     confidence: Optional[float] = None,
+    source_url: Optional[str] = None,
 ) -> str:
     """Write an append-only appraisal record for a coin (never overwrites history).
 
@@ -612,6 +641,9 @@ async def record_appraisal(
     include ``*_display`` strings like ``"$5.00"`` for humans. ``value_cents``
     and ``token_cost`` are INTEGER CENTS. A significant or asserted value change
     must be backed by one of these records before you state it to the user.
+    When the appraisal is backed by an observable source (auction result,
+    dealer listing, price-guide page), pass its URL as ``source_url`` — the
+    citation belongs in the record.
 
     Returns ``{appraisal_id, coin}`` with the new appraisal id and updated coin.
     """
@@ -624,6 +656,7 @@ async def record_appraisal(
             rationale=rationale,
             token_cost=token_cost,
             confidence=confidence,
+            source_url=source_url,
         )
         result = await _client().request_json(
             "POST",

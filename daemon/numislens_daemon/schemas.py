@@ -128,6 +128,13 @@ class AppraiseBody(StrictModel):
         default=None, description="Token cost in cents (integer)."
     )
     confidence: Optional[float] = None
+    source_url: Optional[str] = Field(
+        default=None,
+        description=(
+            "Citation for the appraisal (auction result, dealer listing, "
+            "price-guide page) — provenance belongs in the record."
+        ),
+    )
 
 
 class DigestItem(StrictModel):

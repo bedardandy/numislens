@@ -636,3 +636,23 @@ def test_find_duplicates_groups_by_identity(ledger):
     accessions = {m["accession_no"] for m in g["coins"]}
     assert accessions == {a, b, c}
     assert all(m["location_path"] is None for m in g["coins"])
+
+
+def test_record_appraisal_stores_source_url(ledger):
+    accession = ledger.add_coin(series="Morgan Dollar", year=1885)
+    appraisal_id = ledger.record_appraisal(
+        accession,
+        "human",
+        value_cents=25000,
+        rationale="sold comp on eBay",
+        source_url="https://www.ebay.example/itm/123",
+    )
+    rows = ledger.list_appraisals(accession)
+    assert rows[0]["id"] == appraisal_id
+    assert rows[0]["source_url"] == "https://www.ebay.example/itm/123"
+
+
+def test_record_appraisal_source_url_is_optional(ledger):
+    accession = ledger.add_coin()
+    ledger.record_appraisal(accession, "human", value_cents=100)
+    assert ledger.list_appraisals(accession)[0]["source_url"] is None

@@ -2786,6 +2786,18 @@
               }
             ],
             "title": "Confidence"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Citation for the appraisal (auction result, dealer listing, price-guide page) — provenance belongs in the record."
           }
         },
         "additionalProperties": false,
