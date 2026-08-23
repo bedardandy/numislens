@@ -42,7 +42,15 @@ def _load_pair(base: Path, entry: dict, cfg) -> list[Image64]:
             p = entry.get(side)
             if not p:
                 continue
-            raws.append((base / p).read_bytes())
+            path = base / p
+            if not path.is_file():
+                # A staging mistake, not a pipeline result: raise with enough
+                # context to fix the ground-truth entry (the score loop turns
+                # this into a per-entry error and keeps scoring the rest).
+                raise FileNotFoundError(
+                    f"entry {entry.get('id')!r}: image not found: {path}"
+                )
+            raws.append(path.read_bytes())
     return [Image64.from_bytes(r, max_edge=cfg.max_image_edge) for r in raws]
 
 
@@ -82,10 +90,19 @@ def score(cfg, gt_path: Path) -> dict:
     escalated = 0
     scored = 0
     per_pair: list[dict] = []
+    errors: list[str] = []
 
     for entry in pairs:
         truth = entry.get("truth", {})
-        images = _load_pair(base, entry, cfg)
+        try:
+            images = _load_pair(base, entry, cfg)
+        except (OSError, ValueError) as exc:
+            # Missing/corrupt staged image: record, keep scoring the rest.
+            errors.append(str(exc))
+            per_pair.append(
+                {"id": entry.get("id"), "error": str(exc)}
+            )
+            continue
         tiered = pipeline.run_tiers_and_gate(
             cfg, images, known_series=known_series, key_date_years=set()
         )
@@ -138,6 +155,7 @@ def score(cfg, gt_path: Path) -> dict:
     return {
         "scored_pairs": scored,
         "escalation_rate": esc_rate,
+        "staging_errors": errors,
         "per_tier": {k: tally.pct(k) for k in sorted(tally.counts)},
         "per_pair": per_pair,
     }
@@ -157,6 +175,15 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config(require_token=False)
     report = score(cfg, gt_path)
     print(json.dumps(report, indent=2, ensure_ascii=False, default=str))
+    if report["staging_errors"]:
+        # The report above is still valid for the entries that ran; exit
+        # non-zero so scripts/CI notice the staging problem. Fail loud.
+        print(
+            f"\n{len(report['staging_errors'])} staging error(s) — fix the "
+            "ground-truth entries listed in staging_errors above.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

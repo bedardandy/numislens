@@ -39,7 +39,8 @@ Melt fetching is keyless and fail-loud: it never fabricates a price and exits no
 - **Value-watch**: token-efficient, three tiers cheapest-first — daily melt (automatic), a weekly market digest that fans one search out to staleness flags (`/watch/digest`), and a monthly top-value watchlist sweep. Staleness is metadata (it never changes a stored value); a ≥10% spot move auto-flags hybrid/numismatic coins, and an appraisal clears the flag. Optional keyless ntfy push on big moves.
 - **Offline-first**: cached read snapshots (always shown with an OFFLINE banner) and a queue for offline coin moves that replays in order when connectivity returns.
 - **Cycle-count mode**: warehouse-style reconciliation of a location's expected contents against what is physically present, with a copyable report.
-- **QR labels**: printable accession labels (PDF) whose QR codes deep-link into the app.
+-   **QR labels**: printable accession labels (PDF) whose QR codes deep-link into the app.
+-   **Listing kits**: one zip per coin — deterministic listing text assembled only from ledger facts, the stored photos, and `metadata.json` carrying the full append-only provenance trail with source citations. A staging listings CSV covers everything marked for sale; verify the marketplace column mapping at upload (no taxonomy IDs are invented here).
 - **Installable PWA**: works offline, installs on mobile and desktop.
 
 ## Technology Stack

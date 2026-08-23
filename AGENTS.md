@@ -31,6 +31,7 @@ numislens/
 │   │   ├── money.py               # exact dollar-string -> integer-cents parser
 │   │   ├── csvio.py               # CSV export/import contract (all-or-nothing)
 │   │   ├── reference.py           # curated cited value data: strict loader, exact-match lookup
+│   │   ├── listing.py             # deterministic listing text + staging CSV (facts only)
 │   │   └── cli.py                 # `numislens` console script
 │   ├── migrations/                # 001_initial … 009_appraisal_source_url
 │   ├── sets/                      # set manifests (JSON) + manifest.schema.json
@@ -47,7 +48,7 @@ numislens/
 │   │   ├── schemas.py             # Pydantic request bodies (extra="forbid")
 │   │   ├── serializers.py         # pure response shaping (adds *_display)
 │   │   ├── labels.py              # QR label-sheet PDF rendering
-│   │   └── routers/               # coins, locations, sets, melt, labels, watch, import_export
+│   │   └── routers/               # coins, locations, sets, melt, labels, watch, import_export, selling
 │   └── tests/                     # pytest: auth, coins, images, labels, locations, melt, quickadd, sets, validation, report, rolls, albums, watch, import_export
 ├── surfaces/                      # thin assistant skins over the REST API
 │   ├── openapi.json               # generated spec (regen: scripts/export_openapi.py)
