@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "id": "lincoln-wheat-cents",
+  "name": "Lincoln Wheat Cents — key dates, semi-keys, and a common-date grade ladder",
+  "series": "Lincoln Wheat Cent",
+  "country": "US",
+  "denomination": "cent",
+  "notable_threshold_cents": 100,
+  "source": {
+    "name": "PCGS Price Guide (retail) — ballpark snapshot for triage",
+    "url": "https://www.pcgs.com/prices/detail/lincoln-cent-wheat-reverse-1909-1958/719/most-active",
+    "retrieved": "2026-08-01",
+    "notes": "Retail-guide ballparks rounded for triage, NOT sale prices. Verify before listing. 1909-S is deliberately EXCLUDED because the VDB variety splits it into two very different coins that year+mintmark cannot distinguish."
+  },
+  "entries": [
+    { "year": 1908, "mintmark": "S", "grade": null, "value_cents": 2500,
+      "note": "first-year semi-key; any-condition flag" },
+    { "year": 1908, "mintmark": "S", "grade": "G", "value_cents": 6500 },
+    { "year": 1908, "mintmark": "S", "grade": "F", "value_cents": 12000 },
+    { "year": 1908, "mintmark": "S", "grade": "VF", "value_cents": 18000 },
+    { "year": 1908, "mintmark": "S", "grade": "XF", "value_cents": 28000 },
+    { "year": 1908, "mintmark": "S", "grade": "UNC", "value_cents": 45000 },
+
+    { "year": 1909, "mintmark": "S", "grade": null, "value_cents": 4000,
+      "note": "plain 1909-S only; the rare 1909-S VDB is a separate variety this table cannot express" },
+    { "year": 1909, "mintmark": "S", "grade": "G", "value_cents": 9000 },
+    { "year": 1909, "mintmark": "S", "grade": "F", "value_cents": 16000 },
+    { "year": 1909, "mintmark": "S", "grade": "VF", "value_cents": 25000 },
+    { "year": 1909, "mintmark": "S", "grade": "XF", "value_cents": 40000 },
+    { "year": 1909, "mintmark": "S", "grade": "UNC", "value_cents": 150000 },
+
+    { "year": 1914, "mintmark": "D", "grade": null, "value_cents": 25000,
+      "note": "major key date; any-condition flag" },
+    { "year": 1914, "mintmark": "D", "grade": "G", "value_cents": 30000 },
+    { "year": 1914, "mintmark": "D", "grade": "F", "value_cents": 65000 },
+    { "year": 1914, "mintmark": "D", "grade": "VF", "value_cents": 110000 },
+    { "year": 1914, "mintmark": "D", "grade": "XF", "value_cents": 180000 },
+    { "year": 1914, "mintmark": "D", "grade": "AU", "value_cents": 300000 },
+    { "year": 1914, "mintmark": "D", "grade": "UNC", "value_cents": 800000 },
+
+    { "year": 1922, "mintmark": "D", "grade": null, "value_cents": 1000,
+      "note": "normal 1922-D; the 'No D' variety is not representable here" },
+    { "year": 1922, "mintmark": "D", "grade": "G", "value_cents": 1500 },
+    { "year": 1922, "mintmark": "D", "grade": "VF", "value_cents": 3500 },
+    { "year": 1922, "mintmark": "D", "grade": "XF", "value_cents": 6000 },
+    { "year": 1922, "mintmark": "D", "grade": "UNC", "value_cents": 20000 },
+
+    { "year": 1924, "mintmark": "D", "grade": null, "value_cents": 2000 },
+    { "year": 1924, "mintmark": "D", "grade": "G", "value_cents": 5000 },
+    { "year": 1924, "mintmark": "D", "grade": "F", "value_cents": 12000 },
+    { "year": 1924, "mintmark": "D", "grade": "VF", "value_cents": 22000 },
+    { "year": 1924, "mintmark": "D", "grade": "XF", "value_cents": 35000 },
+    { "year": 1924, "mintmark": "D", "grade": "AU", "value_cents": 55000 },
+    { "year": 1924, "mintmark": "D", "grade": "UNC", "value_cents": 150000 },
+
+    { "year": 1926, "mintmark": "S", "grade": null, "value_cents": 150 },
+    { "year": 1926, "mintmark": "S", "grade": "G", "value_cents": 250 },
+    { "year": 1926, "mintmark": "S", "grade": "VF", "value_cents": 600 },
+    { "year": 1926, "mintmark": "S", "grade": "XF", "value_cents": 1100 },
+    { "year": 1926, "mintmark": "S", "grade": "UNC", "value_cents": 4000 },
+
+    { "year": 1931, "mintmark": "S", "grade": null, "value_cents": 3000 },
+    { "year": 1931, "mintmark": "S", "grade": "G", "value_cents": 10000 },
+    { "year": 1931, "mintmark": "S", "grade": "F", "value_cents": 14000 },
+    { "year": 1931, "mintmark": "S", "grade": "VF", "value_cents": 18000 },
+    { "year": 1931, "mintmark": "S", "grade": "XF", "value_cents": 25000 },
+    { "year": 1931, "mintmark": "S", "grade": "AU", "value_cents": 40000 },
+    { "year": 1931, "mintmark": "S", "grade": "UNC", "value_cents": 120000 },
+
+    { "year": 1955, "mintmark": null, "grade": null, "value_cents": 50,
+      "note": "common 1955; the doubled-die obverse is a variety this table cannot express — a suspicious-looking 1955 deserves eyes" }
+  ]
+}

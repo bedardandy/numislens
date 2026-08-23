@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "jefferson-nickels",
+  "name": "Jefferson Nickels — the classic 'worth more than face' surprises",
+  "series": "Jefferson Nickel",
+  "country": "US",
+  "denomination": "nickel",
+  "notable_threshold_cents": 100,
+  "source": {
+    "name": "PCGS Price Guide (retail) — ballpark snapshot for triage",
+    "url": "https://www.pcgs.com/prices/detail/jefferson-5c-1938-today/727/most-active",
+    "retrieved": "2026-08-01",
+    "notes": "Retail-guide ballparks for triage, NOT sale prices. War-time (1942-1945) 35% silver nickels are priced by the melt engine via their composition row; this table covers collector-premium dates only."
+  },
+  "entries": [
+    { "year": 1939, "mintmark": "D", "grade": null, "value_cents": 150 },
+    { "year": 1939, "mintmark": "D", "grade": "G", "value_cents": 300 },
+    { "year": 1939, "mintmark": "D", "grade": "VF", "value_cents": 800 },
+    { "year": 1939, "mintmark": "D", "grade": "XF", "value_cents": 1500 },
+    { "year": 1939, "mintmark": "D", "grade": "UNC", "value_cents": 5000 },
+
+    { "year": 1950, "mintmark": "D", "grade": null, "value_cents": 800,
+      "note": "the famous rarity-of-the-book low-mintage issue" },
+    { "year": 1950, "mintmark": "D", "grade": "G", "value_cents": 1500 },
+    { "year": 1950, "mintmark": "D", "grade": "F", "value_cents": 3000 },
+    { "year": 1950, "mintmark": "D", "grade": "VF", "value_cents": 6000 },
+    { "year": 1950, "mintmark": "D", "grade": "XF", "value_cents": 12000 },
+    { "year": 1950, "mintmark": "D", "grade": "AU", "value_cents": 20000 },
+    { "year": 1950, "mintmark": "D", "grade": "UNC", "value_cents": 40000 }
+  ]
+}

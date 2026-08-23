@@ -12,6 +12,7 @@ from .ledger import (
     UnknownSeries,
 )
 from .manifests import ManifestError, load_manifest, validate_manifest
+from .reference import ReferenceError, ReferenceSet, load_references
 from .albums import (
     AlbumError,
     AlbumNotFound,
@@ -56,6 +57,9 @@ __all__ = [
     "load_manifest",
     "validate_manifest",
     "ManifestError",
+    "ReferenceError",
+    "ReferenceSet",
+    "load_references",
     "AlbumError",
     "AlbumNotFound",
     "AlbumUncertain",

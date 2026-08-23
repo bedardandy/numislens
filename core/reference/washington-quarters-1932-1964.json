@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "washington-quarters-1932-1964",
+  "name": "Washington Quarters 1932-1964 — the two keys that melt cannot price",
+  "series": "Washington Quarter",
+  "country": "US",
+  "denomination": "quarter",
+  "notable_threshold_cents": 100,
+  "source": {
+    "name": "PCGS Price Guide (retail) — ballpark snapshot for triage",
+    "url": "https://www.pcgs.com/prices/detail/washington-quarter-1932-1964/544/most-active",
+    "retrieved": "2026-08-01",
+    "notes": "Retail-guide ballparks for triage, NOT sale prices. Common-date 90% silver quarters are priced by the melt engine; this table covers only 1932-D and 1932-S, whose collector premiums dwarf melt."
+  },
+  "entries": [
+    { "year": 1932, "mintmark": "D", "grade": null, "value_cents": 1500,
+      "note": "key date; any-condition flag — a worn example is still worth far more than melt" },
+    { "year": 1932, "mintmark": "D", "grade": "G", "value_cents": 12500 },
+    { "year": 1932, "mintmark": "D", "grade": "F", "value_cents": 25000 },
+    { "year": 1932, "mintmark": "D", "grade": "VF", "value_cents": 45000 },
+    { "year": 1932, "mintmark": "D", "grade": "XF", "value_cents": 90000 },
+    { "year": 1932, "mintmark": "D", "grade": "AU", "value_cents": 175000 },
+    { "year": 1932, "mintmark": "D", "grade": "UNC", "value_cents": 350000 },
+
+    { "year": 1932, "mintmark": "S", "grade": null, "value_cents": 1500,
+      "note": "key date; any-condition flag" },
+    { "year": 1932, "mintmark": "S", "grade": "G", "value_cents": 10000 },
+    { "year": 1932, "mintmark": "S", "grade": "F", "value_cents": 20000 },
+    { "year": 1932, "mintmark": "S", "grade": "VF", "value_cents": 35000 },
+    { "year": 1932, "mintmark": "S", "grade": "XF", "value_cents": 65000 },
+    { "year": 1932, "mintmark": "S", "grade": "AU", "value_cents": 120000 },
+    { "year": 1932, "mintmark": "S", "grade": "UNC", "value_cents": 250000 }
+  ]
+}
