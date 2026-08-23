@@ -1,10 +1,12 @@
-import { listCoins, locationTree } from '../api.js';
+import { listCoinsPage, locationTree } from '../api.js';
 import { toast } from '../app.js';
 import { cacheSnapshot, readSnapshot, offlineBanner, isNetworkError } from '../offline.js';
 import { navigate } from '../router.js';
 import { flattenLocationTree, populateLocationSelect } from '../tree.js';
 
 const EM_DASH = '\u2014';
+const PAGE_SIZE = 50;
+const DISPOSITIONS = ['owned', 'for_sale', 'sold', 'discarded'];
 
 function display(value) {
   if (value == null || value === '') return EM_DASH;
@@ -18,7 +20,7 @@ function formatYearMint(year, mintmark) {
   return `${hasYear ? String(year) : EM_DASH}${hasMint ? String(mintmark) : EM_DASH}`;
 }
 
-function buildFilterParams(seriesInput, yearInput, mintmarkInput, locationSelect) {
+function buildFilterParams(seriesInput, yearInput, mintmarkInput, locationSelect, dispositionSelect) {
   const params = {};
   const series = seriesInput.value.trim();
   if (series) params.series = series;
@@ -37,6 +39,9 @@ function buildFilterParams(seriesInput, yearInput, mintmarkInput, locationSelect
     const lid = parseInt(locVal, 10);
     if (!Number.isNaN(lid)) params.location_id = lid;
   }
+
+  const dispVal = dispositionSelect ? dispositionSelect.value : '';
+  if (dispVal && DISPOSITIONS.includes(dispVal)) params.disposition = dispVal;
 
   return params;
 }
@@ -171,6 +176,23 @@ export async function renderInventory(el) {
   locationLabel.appendChild(locationSelect);
   filterBar.appendChild(locationLabel);
 
+  const dispositionLabel = document.createElement('label');
+  dispositionLabel.textContent = 'Status';
+  const dispositionSelect = document.createElement('select');
+  dispositionSelect.name = 'disposition';
+  const allDispOption = document.createElement('option');
+  allDispOption.value = '';
+  allDispOption.textContent = 'All statuses';
+  dispositionSelect.appendChild(allDispOption);
+  for (const d of DISPOSITIONS) {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d.replace('_', ' ');
+    dispositionSelect.appendChild(opt);
+  }
+  dispositionLabel.appendChild(dispositionSelect);
+  filterBar.appendChild(dispositionLabel);
+
   const applyBtn = document.createElement('button');
   applyBtn.type = 'button';
   applyBtn.textContent = 'Apply';
@@ -187,17 +209,45 @@ export async function renderInventory(el) {
   resultsContainer.className = 'inventory-results';
   el.appendChild(resultsContainer);
 
-  async function loadCoins() {
-    const params = buildFilterParams(seriesInput, yearInput, mintmarkInput, locationSelect);
+  let accumulated = [];
+  let totalMatching = 0;
+
+  function renderAccumulated(filtered) {
+    if (!accumulated.length) {
+      renderEmptyState(resultsContainer, filtered);
+      return;
+    }
+    renderCoinTable(resultsContainer, accumulated, locationPaths);
+    if (accumulated.length < totalMatching) {
+      const moreWrap = document.createElement('div');
+      moreWrap.style.cssText = 'display:flex;justify-content:center;margin-top:var(--space-md);';
+      const moreBtn = document.createElement('button');
+      moreBtn.type = 'button';
+      moreBtn.textContent = `Load more (${accumulated.length} of ${totalMatching})`;
+      moreBtn.addEventListener('click', () => loadCoins({ append: true }));
+      moreBtn.addEventListener('click', () => moreBtn.remove(), { once: true });
+      moreWrap.appendChild(moreBtn);
+      resultsContainer.appendChild(moreWrap);
+    }
+    if (!filtered && totalMatching === accumulated.length) {
+      cacheSnapshot('coins', accumulated);
+    }
+  }
+
+  async function loadCoins({ append = false } = {}) {
+    const params = buildFilterParams(seriesInput, yearInput, mintmarkInput, locationSelect, dispositionSelect);
     const filtered = Object.keys(params).length > 0;
+    const offset = append ? accumulated.length : 0;
+    if (!append) accumulated = [];
 
     try {
-      const coins = await listCoins(params);
-      if (!filtered) await cacheSnapshot('coins', coins);
-      if (!coins.length) {
-        renderEmptyState(resultsContainer, filtered);
+      const { coins, total } = await listCoinsPage(params, PAGE_SIZE, offset);
+      totalMatching = total;
+      accumulated = accumulated.concat(coins);
+      if (accumulated.length) {
+        renderAccumulated(filtered);
       } else {
-        renderCoinTable(resultsContainer, coins, locationPaths);
+        renderEmptyState(resultsContainer, filtered);
       }
     } catch (err) {
       if (isNetworkError(err)) {
@@ -234,6 +284,7 @@ export async function renderInventory(el) {
     yearInput.value = '';
     mintmarkInput.value = '';
     locationSelect.value = '';
+    dispositionSelect.value = '';
     loadCoins();
   });
 

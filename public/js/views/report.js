@@ -1,4 +1,4 @@
-import { getAppraisalReport, getAppraisalReportPdf } from '../api.js';
+import { getAppraisalReport, getAppraisalReportPdf, exportCoinsCsv } from '../api.js';
 import { formatCents } from '../money.js';
 import { toast } from '../app.js';
 
@@ -111,6 +111,27 @@ export function rollTotalsLine(totals) {
     `Melt ${formatCents(totals.roll_melt_total_cents)} ${MIDDOT} ` +
     `Best ${formatCents(totals.roll_best_total_cents)}`
   );
+}
+
+/**
+ * Realized-P&L lines from the report's ``realized`` block. Returns [] when
+ * nothing has been sold. Missing inputs are DISCLOSED, never imputed.
+ */
+export function realizedLines(realized) {
+  if (realized == null || !realized.sold_count) return [];
+  const gl = formatGainLoss(realized.realized_pnl_cents);
+  const lines = [
+    `${realized.sold_count} sold ${MIDDOT} proceeds ${formatCents(realized.proceeds_cents)} ` +
+      `${MIDDOT} cost ${formatCents(realized.cost_basis_total_cents)} ` +
+      `${MIDDOT} realized ${gl.display}`,
+  ];
+  if (realized.missing_cost_count > 0) {
+    lines.push(
+      `${realized.missing_cost_count} sold coin${realized.missing_cost_count === 1 ? '' : 's'} ` +
+        'have no recorded cost basis — profit is not imputed for them'
+    );
+  }
+  return lines;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,6 +359,11 @@ export async function renderReport(el) {
   downloadBtn.type = 'button';
   downloadBtn.textContent = 'Download PDF';
   actionBar.appendChild(downloadBtn);
+  const csvBtn = document.createElement('button');
+  csvBtn.type = 'button';
+  csvBtn.textContent = 'Export CSV';
+  csvBtn.title = 'Every coin as CSV — spreadsheets, estate sharing, re-import';
+  actionBar.appendChild(csvBtn);
   el.appendChild(actionBar);
 
   const content = document.createElement('div');
@@ -361,6 +387,24 @@ export async function renderReport(el) {
       toast(err.message, 'error');
     } finally {
       downloadBtn.disabled = false;
+    }
+  });
+
+  csvBtn.addEventListener('click', async () => {
+    csvBtn.disabled = true;
+    try {
+      const blob = await exportCoinsCsv();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `numislens-coins-${filenameDate(new Date().toISOString())}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Coins CSV downloaded', 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      csvBtn.disabled = false;
     }
   });
 
@@ -418,6 +462,26 @@ export async function renderReport(el) {
 
     // --- Breakdown cards --------------------------------------------------
     content.appendChild(buildBreakdownCards(breakdown));
+
+    // --- Realized (sold coins) --------------------------------------------
+    const rLines = realizedLines(report.realized);
+    if (rLines.length) {
+      const realizedEl = document.createElement('p');
+      realizedEl.className = 'muted';
+      const gl = formatGainLoss(report.realized.realized_pnl_cents);
+      for (let i = 0; i < rLines.length; i++) {
+        const line = document.createElement('span');
+        line.textContent = rLines[i];
+        line.style.display = 'block';
+        if (i === 0 && gl.tone) {
+          line.style.color =
+            gl.tone === 'gain' ? 'var(--color-success)'
+            : gl.tone === 'loss' ? 'var(--color-error)' : '';
+        }
+        realizedEl.appendChild(line);
+      }
+      content.appendChild(realizedEl);
+    }
 
     const unvaluedCount = breakdown.unvalued?.count ?? totals.unvalued_count ?? 0;
     if (unvaluedCount > 0) {

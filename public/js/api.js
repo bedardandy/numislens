@@ -309,3 +309,58 @@ export function getSetNeeds(setId) {
 export function getWantlistPdf(setId) {
   return fetchBlob(`/api/v1/sets/${encodeURIComponent(setId)}/wantlist.pdf`);
 }
+
+// ---------------------------------------------------------------------------
+// Lifecycle: edit, disposition, duplicates, realized P&L, CSV data portability
+// ---------------------------------------------------------------------------
+
+export function editCoin(accession, body) {
+  return apiFetch(`/api/v1/coins/${encodeURIComponent(accession)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export function setDisposition(accession, body) {
+  return apiFetch(`/api/v1/coins/${encodeURIComponent(accession)}/disposition`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function listDuplicates() {
+  return apiFetch('/api/v1/duplicates');
+}
+
+export function getRealizedPnl() {
+  return apiFetch('/api/v1/portfolio/realized');
+}
+
+/**
+ * Paged coin listing. The response body stays a bare array (backward
+ * compatible); the total matching count rides in X-Total-Count.
+ */
+export async function listCoinsPage(params = {}, limit = null, offset = 0) {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null && value !== '') qs.set(key, value);
+  }
+  if (limit != null) qs.set('limit', String(limit));
+  if (offset > 0) qs.set('offset', String(offset));
+  const query = qs.toString();
+
+  const headers = authHeaders({ Accept: 'application/json' });
+  let response;
+  try {
+    response = await fetch(`/api/v1/coins${query ? `?${query}` : ''}`, { headers });
+  } catch {
+    networkError();
+  }
+  if (!response.ok) await throwApiError(response);
+  const total = parseInt(response.headers.get('X-Total-Count') || '0', 10);
+  return { coins: await response.json(), total };
+}
+
+export async function exportCoinsCsv() {
+  return fetchBlob('/api/v1/export/coins.csv');
+}

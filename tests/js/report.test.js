@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { formatCents } from '../../public/js/money.js';
 import {
+  realizedLines,
   basisLabel,
   metalName,
   formatYearMint,
@@ -170,4 +171,36 @@ test('missingSlotLabel formats year-mint with an optional note', () => {
   assert.equal(missingSlotLabel({ year: 1932, mint: 'D', note: '' }), '1932-D');
   assert.equal(missingSlotLabel({ year: 1932, mint: 'D', note: 'doubled die' }), '1932-D doubled die');
   assert.equal(missingSlotLabel(null), '—');
+});
+
+test('realizedLines returns [] when nothing has been sold', () => {
+  assert.deepEqual(realizedLines(null), []);
+  assert.deepEqual(realizedLines({ sold_count: 0 }), []);
+});
+
+test('realizedLines summarizes proceeds, cost, and realized P&L', () => {
+  const lines = realizedLines({
+    sold_count: 2,
+    proceeds_cents: 2900,
+    cost_basis_total_cents: 1000,
+    realized_pnl_cents: 1900,
+    missing_cost_count: 1,
+    missing_price_count: 0,
+  });
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /2 sold · proceeds \$29\.00 · cost \$10\.00 · realized \+\$19\.00/);
+  assert.match(lines[1], /1 sold coin have no recorded cost basis/);
+});
+
+test('realizedLines omits disclosure when every sale has a cost basis', () => {
+  const lines = realizedLines({
+    sold_count: 1,
+    proceeds_cents: 400,
+    cost_basis_total_cents: 500,
+    realized_pnl_cents: -100,
+    missing_cost_count: 0,
+    missing_price_count: 0,
+  });
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /realized −\$1\.00/);
 });

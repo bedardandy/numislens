@@ -4,12 +4,14 @@ import {
   locationTree,
   moveCoin,
   fetchBlob,
+  setDisposition,
 } from '../api.js';
 import { enqueueMove, isNetworkError } from '../offline.js';
 import { toast, refreshQueueBanner } from '../app.js';
 import { navigate } from '../router.js';
 import { flattenLocationTree, populateLocationSelect } from '../tree.js';
 import { renderPhotoCapture } from '../photo.js';
+import { dollarsToCents, formatCents } from '../money.js';
 
 const EM_DASH = '\u2014';
 
@@ -286,4 +288,120 @@ export async function renderCoin(el, accession) {
   actions.appendChild(movePicker);
   actions.appendChild(photosPanel);
   el.appendChild(actions);
+
+  // --- Disposition (lifecycle) -------------------------------------------
+  const dispositionSection = document.createElement('div');
+  dispositionSection.className = 'detail-actions';
+
+  const dispositionLine = document.createElement('span');
+  if (coin.disposition === 'sold') {
+    dispositionLine.textContent =
+      'SOLD ' + formatCents(coin.sold_price_cents) +
+      (coin.sold_date ? ' on ' + coin.sold_date : '') +
+      (coin.sold_venue ? ' via ' + coin.sold_venue : '');
+    dispositionLine.style.fontWeight = '600';
+  } else {
+    dispositionLine.textContent =
+      'Status: ' + display(coin.disposition || 'owned');
+  }
+  dispositionSection.appendChild(dispositionLine);
+
+  const soldForm = document.createElement('div');
+  soldForm.style.cssText =
+    'display:none;flex-wrap:wrap;gap:var(--space-sm);align-items:center;width:100%;';
+
+  const priceInput = document.createElement('input');
+  priceInput.type = 'text';
+  priceInput.inputMode = 'decimal';
+  priceInput.placeholder = 'Sold price ($)';
+  priceInput.setAttribute('aria-label', 'Sold price in dollars');
+
+  const dateInput = document.createElement('input');
+  dateInput.type = 'date';
+  dateInput.setAttribute('aria-label', 'Sale date');
+
+  const venueInput = document.createElement('input');
+  venueInput.type = 'text';
+  venueInput.placeholder = 'Venue (e.g. eBay, coin show)';
+  venueInput.setAttribute('aria-label', 'Sale venue');
+
+  const confirmSoldBtn = document.createElement('button');
+  confirmSoldBtn.type = 'button';
+  confirmSoldBtn.textContent = 'Confirm sold';
+
+  soldForm.appendChild(priceInput);
+  soldForm.appendChild(dateInput);
+  soldForm.appendChild(venueInput);
+  soldForm.appendChild(confirmSoldBtn);
+  dispositionSection.appendChild(soldForm);
+
+  async function transition(disposition, extra = {}) {
+    const updated = await setDisposition(accession, { disposition, ...extra });
+    toast('Status: ' + updated.disposition, 'success');
+    await renderCoin(el, accession);
+  }
+
+  function addTransitionButton(label, target, extraBuilder) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = label;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const extra = extraBuilder ? extraBuilder() : {};
+        await transition(target, extra);
+      } catch (err) {
+        toast(err.message, 'error');
+        btn.disabled = false;
+      }
+    });
+    dispositionSection.appendChild(btn);
+    return btn;
+  }
+
+  function openSoldForm() { soldForm.style.display = 'flex'; priceInput.focus(); }
+
+  confirmSoldBtn.addEventListener('click', async () => {
+    let cents;
+    try {
+      cents = dollarsToCents(priceInput.value);
+    } catch {
+      cents = null;
+    }
+    if (cents == null) {
+      toast('Enter the realized price (0 is allowed — a giveaway is a real outcome)', 'error');
+      return;
+    }
+    confirmSoldBtn.disabled = true;
+    try {
+      const extra = { sold_price_cents: cents };
+      if (dateInput.value) extra.sold_date = dateInput.value;
+      if (venueInput.value.trim()) extra.sold_venue = venueInput.value.trim();
+      await transition('sold', extra);
+    } catch (err) {
+      toast(err.message, 'error');
+      confirmSoldBtn.disabled = false;
+    }
+  });
+
+  const currentDisposition = coin.disposition || 'owned';
+  if (currentDisposition !== 'sold') {
+    const forSaleBtn = addTransitionButton('Mark for sale', 'for_sale');
+    forSaleBtn.style.display = currentDisposition === 'for_sale' ? 'none' : '';
+  }
+  if (currentDisposition !== 'sold') {
+    const markSoldBtn = document.createElement('button');
+    markSoldBtn.type = 'button';
+    markSoldBtn.textContent = 'Mark sold';
+    markSoldBtn.addEventListener('click', () => {
+      soldForm.style.display =
+        soldForm.style.display === 'none' ? 'flex' : 'none';
+    });
+    dispositionSection.appendChild(markSoldBtn);
+  }
+  if (currentDisposition !== 'owned') {
+    addTransitionButton('Back to owned', 'owned');
+  }
+
+  el.appendChild(dispositionSection);
 }
