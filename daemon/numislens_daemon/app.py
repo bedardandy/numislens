@@ -21,6 +21,7 @@ from .routers import (
     melt,
     report,
     rolls,
+    selling,
     sets,
     watch,
 )
@@ -72,6 +73,7 @@ def create_app(
     router.include_router(rolls.router)
     router.include_router(albums.router)
     router.include_router(import_export.router)
+    router.include_router(selling.router)
 
     app.include_router(router)
     register_error_handlers(app)

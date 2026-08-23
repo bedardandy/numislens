@@ -50,9 +50,11 @@ SERVER_URL = "https://numislens.YOUR-TAILNET-NAME.ts.net"
 # Data portability adds GET /api/v1/export/coins.csv and
 # POST /api/v1/import/coins.csv — 43 total. Triage adds
 # GET /api/v1/duplicates — 44 total. Wave 3 adds
-# GET /api/v1/worklist — 45 total.
+# GET /api/v1/worklist — 45 total. Wave 4 sell-prep adds
+# GET /api/v1/coins/{accession}/listing-kit.zip and
+# GET /api/v1/export/listings.csv — 47 total.
 # Assert the real number so an accidental route drop/add is caught at export.
-EXPECTED_PATH_COUNT = 45
+EXPECTED_PATH_COUNT = 47
 
 
 def build_spec() -> dict:

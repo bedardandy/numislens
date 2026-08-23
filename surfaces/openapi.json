@@ -2709,6 +2709,99 @@
           }
         ]
       }
+    },
+    "/api/v1/coins/{accession}/listing-kit.zip": {
+      "get": {
+        "tags": [
+          "selling"
+        ],
+        "summary": "Listing Kit",
+        "description": "Everything a marketplace listing needs, in one zip.\n\nlisting.txt (deterministic title + description from ledger facts only),\nthe stored photos, and metadata.json (full record + append-only\nappraisal trail with source citations). Absent facts are omitted, never\npadded — the kit states what the ledger knows and nothing more.",
+        "operationId": "listing_kit_api_v1_coins__accession__listing_kit_zip_get",
+        "parameters": [
+          {
+            "name": "accession",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Accession"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/export/listings.csv": {
+      "get": {
+        "tags": [
+          "selling"
+        ],
+        "summary": "Export Listings",
+        "description": "Staging CSV for marketplace upload, one row per coin in a disposition.\n\nDefaults to for_sale (sell-prep is the point); pass any valid disposition.\nColumn NAMES follow eBay's bulk-listing template where stable, but no\ntaxonomy IDs are invented — verify the mapping against your template\nbefore upload. StartPrice falls back to cost basis when no estimate\nexists; an EMPTY StartPrice means the seller must set one.",
+        "operationId": "export_listings_api_v1_export_listings_csv_get",
+        "parameters": [
+          {
+            "name": "disposition",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "for_sale",
+              "title": "Disposition"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
