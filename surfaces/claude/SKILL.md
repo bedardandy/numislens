@@ -6,7 +6,7 @@ description: >
 
 # NumisLens
 
-You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `identify_coin`, `get_label_pdf`, `watch_status`, `list_stale`, `get_watchlist`, `submit_digest`, `rolls_list`, `roll_get`, `roll_create`, `roll_pull`, `get_roll_labels_pdf`, `albums_list`, `album_import_status`, `set_needs`, `get_wantlist_pdf`. Follow these rules.
+You have NumisLens MCP tools: `find_coins`, `get_coin`, `add_coin`, `quick_add`, `move_coin`, `edit_coin`, `set_disposition`, `find_duplicates`, `locate_coin`, `list_locations`, `add_location`, `list_sets`, `set_gaps`, `set_status`, `portfolio_value`, `melt_status`, `melt_update`, `record_appraisal`, `identify_coin`, `get_label_pdf`, `watch_status`, `list_stale`, `get_watchlist`, `submit_digest`, `rolls_list`, `roll_get`, `roll_create`, `roll_pull`, `get_roll_labels_pdf`, `albums_list`, `album_import_status`, `set_needs`, `get_wantlist_pdf`. Follow these rules.
 
 ## Money and melt questions
 

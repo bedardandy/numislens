@@ -28,6 +28,8 @@ numislens/
 │   │   ├── ledger.py              # Ledger: coins, locations, sets, appraisals, events, images
 │   │   ├── manifests.py           # set-manifest load/validate
 │   │   ├── melt.py                # keyless dual-source spot fetch + melt recompute
+│   │   ├── money.py               # exact dollar-string -> integer-cents parser
+│   │   ├── csvio.py               # CSV export/import contract (all-or-nothing)
 │   │   └── cli.py                 # `numislens` console script
 │   ├── migrations/                # 001_initial … 006_albums (rolls, album imports)
 │   ├── sets/                      # set manifests (JSON) + manifest.schema.json
@@ -43,8 +45,8 @@ numislens/
 │   │   ├── schemas.py             # Pydantic request bodies (extra="forbid")
 │   │   ├── serializers.py         # pure response shaping (adds *_display)
 │   │   ├── labels.py              # QR label-sheet PDF rendering
-│   │   └── routers/               # coins, locations, sets, melt, labels, watch
-│   └── tests/                     # pytest: auth, coins, images, labels, locations, melt, quickadd, sets, validation
+│   │   └── routers/               # coins, locations, sets, melt, labels, watch, import_export
+│   └── tests/                     # pytest: auth, coins, images, labels, locations, melt, quickadd, sets, validation, report, rolls, albums, watch, import_export
 ├── surfaces/                      # thin assistant skins over the REST API
 │   ├── openapi.json               # generated spec (regen: scripts/export_openapi.py)
 │   ├── README.md
