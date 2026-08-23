@@ -1,4 +1,9 @@
-import { getAppraisalReport, getAppraisalReportPdf, exportCoinsCsv } from '../api.js';
+import {
+  getAppraisalReport,
+  getAppraisalReportPdf,
+  exportCoinsCsv,
+  exportListingsCsv,
+} from '../api.js';
 import { formatCents } from '../money.js';
 import { toast } from '../app.js';
 
@@ -418,6 +423,11 @@ export async function renderReport(el) {
   csvBtn.textContent = 'Export CSV';
   csvBtn.title = 'Every coin as CSV — spreadsheets, estate sharing, re-import';
   actionBar.appendChild(csvBtn);
+  const listingsBtn = document.createElement('button');
+  listingsBtn.type = 'button';
+  listingsBtn.textContent = 'Export listings';
+  listingsBtn.title = 'Staging CSV for coins marked for sale (marketplace upload prep)';
+  actionBar.appendChild(listingsBtn);
   el.appendChild(actionBar);
 
   const content = document.createElement('div');
@@ -459,6 +469,24 @@ export async function renderReport(el) {
       toast(err.message, 'error');
     } finally {
       csvBtn.disabled = false;
+    }
+  });
+
+  listingsBtn.addEventListener('click', async () => {
+    listingsBtn.disabled = true;
+    try {
+      const blob = await exportListingsCsv('for_sale');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `numislens-listings-${filenameDate(new Date().toISOString())}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Listings CSV downloaded', 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      listingsBtn.disabled = false;
     }
   });
 

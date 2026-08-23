@@ -5,6 +5,7 @@ import {
   moveCoin,
   fetchBlob,
   setDisposition,
+  getListingKit,
 } from '../api.js';
 import { enqueueMove, isNetworkError } from '../offline.js';
 import { toast, refreshQueueBanner } from '../app.js';
@@ -266,6 +267,28 @@ export async function renderCoin(el, accession) {
     }
   });
 
+  const listingKitBtn = document.createElement('button');
+  listingKitBtn.type = 'button';
+  listingKitBtn.textContent = 'Listing kit';
+  listingKitBtn.title = 'Zip: listing text + photos + full provenance (metadata.json)';
+  listingKitBtn.addEventListener('click', async () => {
+    listingKitBtn.disabled = true;
+    try {
+      const blob = await getListingKit(accession);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `numislens-listing-${accession}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Listing kit downloaded', 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      listingKitBtn.disabled = false;
+    }
+  });
+
   const photosPanel = document.createElement('div');
   photosPanel.style.cssText = 'display:none;width:100%;margin-top:var(--space-md);';
   let photosBuilt = false;
@@ -283,6 +306,7 @@ export async function renderCoin(el, accession) {
 
   actions.appendChild(moveBtn);
   actions.appendChild(printBtn);
+  actions.appendChild(listingKitBtn);
   actions.appendChild(photosBtn);
   actions.appendChild(movePicker);
   actions.appendChild(photosPanel);

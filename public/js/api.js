@@ -364,3 +364,16 @@ export async function listCoinsPage(params = {}, limit = null, offset = 0) {
 export async function exportCoinsCsv() {
   return fetchBlob('/api/v1/export/coins.csv');
 }
+
+// ---------------------------------------------------------------------------
+// Sell prep: listing kits and staging listings CSV
+// ---------------------------------------------------------------------------
+
+export function getListingKit(accession) {
+  return fetchBlob(`/api/v1/coins/${encodeURIComponent(accession)}/listing-kit.zip`);
+}
+
+export function exportListingsCsv(disposition = 'for_sale') {
+  const qs = `?disposition=${encodeURIComponent(disposition)}`;
+  return fetchBlob(`/api/v1/export/listings.csv${qs}`);
+}
