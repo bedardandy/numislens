@@ -153,3 +153,25 @@ def test_key_date_three_tier_needs_all_agree():
                  gemma, key_date_years={1932})
     assert r["accepted"]["year"] is None
     assert "year" in _fields_escalated(r)
+
+
+def test_key_date_is_not_accepted_on_a_single_available_tier():
+    """ "All available tiers agree" must not degenerate to one unverified
+    reading. With OCR (or the VLM) down, a key-date year/mintmark escalates —
+    it is exactly the reading that most needs a second, independent look."""
+    vlm = _vlm(year=1914, present=True, letter="D",
+               series="Lincoln Wheat Cent", grade="VF")
+    r = run_gate(_ocr(available=False), vlm, _no_gemma(), key_date_years={1914})
+    assert r["accepted"]["year"] is None
+    assert r["accepted"]["mintmark"] is None
+    assert {"year", "mintmark"} <= _fields_escalated(r)
+
+    ocr = _ocr(year=1914, present=True, letter="D")
+    r = run_gate(ocr, _vlm(available=False), _no_gemma(), key_date_years={1914})
+    assert r["accepted"]["year"] is None
+    assert r["accepted"]["mintmark"] is None
+
+    # Both readers up and agreeing still accepts.
+    r = run_gate(ocr, vlm, _no_gemma(), key_date_years={1914})
+    assert r["accepted"]["year"] == 1914
+    assert r["accepted"]["mintmark"] == "D"

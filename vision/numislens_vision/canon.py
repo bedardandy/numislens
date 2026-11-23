@@ -89,6 +89,27 @@ _NUM_WORDS = {
 }
 
 _YEAR_RE = re.compile(r"(1[5-9]\d\d|20\d\d)")
+# The same, but as a standalone token in flat text: a year buried in a longer
+# digit run (a slab cert number, a phone number) is not a date.
+_YEAR_TOKEN_RE = re.compile(r"(?<!\d)(1[5-9]\d\d|20\d\d)(?!\d)")
+
+# A reader that hedges, refuses or negates has not given a reading. Every
+# prompt in tiers.py tells the model to answer "unclear" when it cannot tell,
+# so these words mean "no answer" — never material to mine a value out of.
+_NO_READING_RE = re.compile(
+    r"\b(unclear|unsure|uncertain|unreadable|illegible|cannot|unable|"
+    r"impossible|not|no\s+way)\b|n't\b"
+)
+
+
+def _single_year(candidates: list[str]) -> int | None:
+    """One distinct plausible year, or None. Two different years (a dual-dated
+    1776-1976 coin, a statehood date beside the mint date) is an ambiguity the
+    gate must escalate, not a tie to break by reading order."""
+    distinct = set(candidates)
+    if len(distinct) == 1:
+        return int(next(iter(distinct)))
+    return None
 
 
 def canon_grade(text: str | None) -> str | None:
@@ -100,15 +121,28 @@ def canon_grade(text: str | None) -> str | None:
     if not text:
         return None
     low = text.lower()
-    # Phrase synonyms first (longest already ordered).
+    # A refusal or hedge is not a grade: "not good enough to determine the
+    # grade" must never become G because it contains the word "good".
+    if _NO_READING_RE.search(low):
+        return None
+    found: set[str] = set()
+    # Phrase synonyms first (longest already ordered). Each matched phrase is
+    # blanked so its words are not re-read as a second, shorter grade
+    # ("extremely fine" is XF, not XF and F).
     for phrase, bucket in _GRADE_SYNONYMS:
-        if re.search(r"\b" + re.escape(phrase) + r"\b", low):
-            return bucket
+        pattern = re.compile(r"\b" + re.escape(phrase) + r"\b")
+        if pattern.search(low):
+            found.add(bucket)
+            low = pattern.sub(lambda m: " " * len(m.group(0)), low)
     # Abbreviations, incl. "MS63"/"AU-58"/"XF 45" (letters then optional digits).
     for m in re.finditer(r"\b([a-z]{1,3})\b", low):
         tok = m.group(1)
         if tok in _GRADE_ABBREV:
-            return _GRADE_ABBREV[tok]
+            found.add(_GRADE_ABBREV[tok])
+    # Exactly one bucket, or nothing. "VF. Good eye appeal." names two; picking
+    # either would be a guess, and grade is accepted on this reading alone.
+    if len(found) == 1:
+        return next(iter(found))
     return None
 
 
@@ -117,25 +151,29 @@ def parse_year_digits(text: str | None) -> int | None:
 
     Do NOT trust a bare year token: instead reconstruct the digit stream from
     both number-words ("one nine four three") and ASCII digits ("1 9 4 3" or
-    "1943"), then take the first plausible 4-digit year (15xx-19xx or 20xx).
-    Returns None if no plausible year forms.
+    "1943"), then take the plausible 4-digit year (15xx-19xx or 20xx) it forms.
+
+    Returns None when no plausible year forms, when ANY digit was reported
+    unclear (closing the gap around a missing digit would manufacture a year
+    nobody read: "1, 9, unclear, 3 ... possibly 1943" is not 1931), or when
+    the reading yields two different years.
     """
     if not text:
         return None
     low = text.lower()
+    if _NO_READING_RE.search(low):
+        return None
     # Tokenize into number-words and digit runs, in reading order.
     digits: list[str] = []
     for tok in re.findall(r"[a-z]+|\d+", low):
         if tok in _NUM_WORDS:
             digits.append(_NUM_WORDS[tok])
-        elif tok.isdigit():
+        elif tok.isdigit() and len(tok) <= 4:
             digits.extend(list(tok))
-        # non-numeric words are separators, ignored
+        # non-numeric words are separators, ignored; a digit run longer than
+        # four is some other number (a cert, a catalogue id), never a date.
     stream = "".join(digits)
-    m = _YEAR_RE.search(stream)
-    if m is not None:
-        return int(m.group(1))
-    return None
+    return _single_year(_YEAR_RE.findall(stream))
 
 
 def canon_mintmark(text: str | None) -> tuple[bool | None, str | None]:
@@ -152,7 +190,11 @@ def canon_mintmark(text: str | None) -> tuple[bool | None, str | None]:
     """
     if not text:
         return None, None
-    low = text.lower()
+    # A possessive is not a mint letter: "this coin's mintmark" has no S in it.
+    low = re.sub(r"['\u2019]s\b", "", text.lower())
+    # The prompt's own "cannot tell" answer, wherever it appears.
+    if re.search(r"\b(unclear|unsure|uncertain|unreadable|illegible)\b", low):
+        return None, None
     # Affirmative "no mintmark" statements.
     if re.search(
         r"\b(no|without|absent|none|no\s+mint\s*mark|lacks?)\b.*\bmint\s*mark\b"
@@ -169,9 +211,16 @@ def canon_mintmark(text: str | None) -> tuple[bool | None, str | None]:
         lo = max(0, anchor.start() - 15)
         hi = min(len(low), anchor.end() + 15)
         window = low[lo:hi]
-        for mm in MINTMARKS:
-            if re.search(r"\b" + re.escape(mm.lower()) + r"\b", window):
-                return True, mm
+        seen = [
+            mm
+            for mm in MINTMARKS
+            if re.search(r"\b" + re.escape(mm.lower()) + r"\b", window)
+        ]
+        if len(seen) == 1:
+            return True, seen[0]
+        if len(seen) > 1:
+            # "Mintmark: S or D" — two letters is a hedge, not a reading.
+            return None, None
     # A response that is just a bare allowed token ("D", "CC").
     bare = low.strip().strip(".:! ")
     for mm in MINTMARKS:
@@ -233,11 +282,15 @@ def canon_series(text: str | None, known: list[str]) -> str | None:
 
 
 def find_year_in_text(text: str | None) -> int | None:
-    """Extract the first plausible 4-digit year from flat OCR text."""
+    """Extract the one plausible 4-digit year from flat OCR text.
+
+    A standalone token only (not four digits inside a longer number), and
+    only when the text carries a single distinct year — two different dates
+    on one coin are escalated by the gate, not resolved by reading order.
+    """
     if not text:
         return None
-    m = _YEAR_RE.search(text)
-    return int(m.group(1)) if m else None
+    return _single_year(_YEAR_TOKEN_RE.findall(text))
 
 
 # --- Denomination ----------------------------------------------------------

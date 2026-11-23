@@ -129,9 +129,18 @@ def run_gate(
 
     # --- year + mintmark ---------------------------------------------------
     if key_relevant:
-        y_val, y_ok = _all_available_agree(year_readings, available)
-        m_val, m_ok = _all_available_agree(mint_readings, available)
-        note = "key-date year: all available tiers must agree"
+        # Unanimity among available tiers is only a check when there is more
+        # than one independent reader. With OCR or the VLM down, "everyone
+        # available agrees" would degenerate to a single unverified reading —
+        # on exactly the coins where a wrong digit or mint letter costs most.
+        if {"ocr", "vlm"} <= available:
+            y_val, y_ok = _all_available_agree(year_readings, available)
+            m_val, m_ok = _all_available_agree(mint_readings, available)
+            note = "key-date year: all available tiers must agree"
+        else:
+            y_val, y_ok = None, False
+            m_val, m_ok = None, False
+            note = "key-date year: needs both OCR and VLM available to cross-check"
         if y_ok:
             accepted["year"] = y_val
         else:
