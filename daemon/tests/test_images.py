@@ -5,6 +5,8 @@ from __future__ import annotations
 import io
 import re
 
+import pytest
+
 from fastapi.testclient import TestClient
 from numislens_core import Ledger
 from PIL import Image
@@ -274,3 +276,47 @@ def test_deep_link_serves_shell(
     assert response.status_code == 200
     assert "<title>NumisLens</title>" in response.text
     assert "/js/app.js" in response.text
+
+
+def _oriented_bytes(fmt: str) -> bytes:
+    """A 40x20 landscape frame tagged "rotate 90 to display" plus GPS, the
+    way a phone held upright stores a portrait photo."""
+    img = Image.new("RGB", (40, 20), (200, 180, 140))
+    metadata = Image.Exif()
+    metadata[0x0112] = 6  # Orientation: rotate 90 CW to display
+    metadata[0x010F] = "TestCam"
+    metadata[0x8825] = {1: "N", 2: (45.0, 30.0, 0.0), 3: "W", 4: (93.0, 15.0, 0.0)}
+    buf = io.BytesIO()
+    img.save(buf, format=fmt, exif=metadata)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize(
+    "fmt,content_type",
+    [("JPEG", "image/jpeg"), ("PNG", "image/png"), ("WEBP", "image/webp")],
+)
+def test_exif_orientation_is_applied_before_metadata_is_stripped(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    make_coin,
+    fmt: str,
+    content_type: str,
+) -> None:
+    """Dropping the orientation tag without applying it stores phone photos
+    sideways. The pixels must be upright AND the metadata (GPS included) gone."""
+    acc = make_coin()
+    upload = client.post(
+        f"/api/v1/coins/{acc}/images",
+        files={"obverse": ("o", _oriented_bytes(fmt), content_type)},
+        headers=auth_headers,
+    )
+    assert upload.status_code == 200
+    content_hash = upload.json()["images"][0]["content_hash"]
+    stored = client.get(
+        f"/api/v1/coins/{acc}/images/{content_hash}", headers=auth_headers
+    )
+    out = Image.open(io.BytesIO(stored.content))
+    assert out.size == (20, 40)  # rotated upright: portrait, not 40x20
+    exif = out.getexif()
+    assert dict(exif) == {}
+    assert dict(exif.get_ifd(0x8825)) == {}

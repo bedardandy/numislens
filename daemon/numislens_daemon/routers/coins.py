@@ -20,7 +20,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 from numislens_core import Ledger
-from PIL import Image
+from PIL import Image, ImageOps
 
 from ..deps import get_ledger
 from ..quickadd import parse_quick_add
@@ -72,8 +72,9 @@ def _reencode_stripped(data: bytes, kind: str) -> tuple[bytes, str]:
 
     Returns (processed_bytes, file_extension). Decoding validates that the
     bytes really are an image regardless of the client-declared content type;
-    re-saving without an EXIF block strips all metadata; oversized longest
-    edges are downscaled with aspect preserved.
+    the EXIF orientation is applied to the pixels and then re-saving without
+    an EXIF block strips all metadata; oversized longest edges are downscaled
+    with aspect preserved.
     """
     try:
         img = Image.open(io.BytesIO(data))
@@ -90,6 +91,11 @@ def _reencode_stripped(data: bytes, kind: str) -> tuple[bytes, str]:
             detail=f"{kind}: unsupported image format: {fmt or 'unknown'} "
                     "(allowed: JPEG, PNG, WEBP)",
         )
+    # Bake the EXIF orientation into the pixels BEFORE the metadata is dropped.
+    # Phone cameras store the sensor's native orientation plus an "rotate me"
+    # tag; stripping the tag without applying it stores the photo sideways or
+    # upside down — for the PWA, the listing kit and the vision tiers alike.
+    img = ImageOps.exif_transpose(img)
     if max(img.size) > MAX_IMAGE_EDGE:
         img.thumbnail((MAX_IMAGE_EDGE, MAX_IMAGE_EDGE), Image.Resampling.LANCZOS)
     # JPEG cannot store alpha/palette modes; flatten onto white like a scan.
