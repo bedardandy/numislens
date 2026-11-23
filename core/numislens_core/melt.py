@@ -351,19 +351,29 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
                 )
 
         # Spot-move staleness trigger: when a metal's primary spot moved >=10%
-        # since the previous primary row, every hybrid/numismatic coin of that
-        # metal is flagged stale (its premium tracks spot). Melt-basis coins are
-        # NOT flagged — they repriced above. Deterministic SQL, no value change.
+        # since the previous primary row, every held hybrid/numismatic coin of
+        # that metal is flagged stale (its premium tracks spot). Melt-basis
+        # coins are NOT flagged — they repriced above. Deterministic SQL, no
+        # value change.
+        #
+        # The trigger compares the two newest stored rows, so it stays "hot"
+        # until another row lands — and a run whose spot fetch failed adds no
+        # row. A coin appraised AFTER the move was observed has already
+        # answered the flag; re-flagging it on every such run would undo the
+        # one thing that clears staleness (record_appraisal).
         for metal, spot_cents in spot_cache.items():
             if spot_cents is None:
                 continue
             move = _primary_spot_move(conn, metal)
             if move is None or abs(move) < STALE_SPOT_PCT:
                 continue
+            observed_at = _parse_iso_ts(
+                latest_spot(conn, metal, PRIMARY_SOURCE)["fetched_at"]
+            )
             reason = f"spot {metal} moved {move:+.1f}%"
-            affected = conn.execute(
+            candidates = conn.execute(
                 f"""
-                SELECT accession_no, stale_since FROM coins
+                SELECT accession_no, stale_since, last_appraised FROM coins
                 WHERE value_basis IN ('hybrid', 'numismatic')
                   AND {HELD_SQL.format(alias="")}
                   AND composition_id IN (
@@ -373,20 +383,15 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
                 """,
                 (metal,),
             ).fetchall()
-            if not affected:
-                continue
-            conn.execute(
-                f"""
-                UPDATE coins SET stale_since = ?, stale_reason = ?
-                WHERE value_basis IN ('hybrid', 'numismatic')
-                  AND {HELD_SQL.format(alias="")}
-                  AND composition_id IN (
-                    SELECT id FROM compositions WHERE metal = ?
-                  )
-                """,
-                (now, reason, metal),
-            )
-            for arow in affected:
+            for arow in candidates:
+                appraised = arow["last_appraised"]
+                if appraised is not None and _parse_iso_ts(appraised) > observed_at:
+                    continue
+                conn.execute(
+                    "UPDATE coins SET stale_since = ?, stale_reason = ? "
+                    "WHERE accession_no = ?",
+                    (now, reason, arow["accession_no"]),
+                )
                 stale_marked.append(
                     {
                         "accession": arow["accession_no"],
