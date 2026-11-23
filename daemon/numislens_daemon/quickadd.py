@@ -60,8 +60,23 @@ _SERIES_ALIASES = {
 # --- Denomination words ----------------------------------------------------
 # (phrase, canonical denomination). Longest phrases first so "half dollar" wins
 # over "dollar". These state the denomination literally; they never imply series.
+#
+# Compound names come BEFORE the bare words they contain: "half eagle" ($5
+# gold), "half dime" and "half cent" are their own denominations, and reading
+# them as "half" -> half dollar (or "quarter eagle" as a quarter) would store a
+# denomination — and with it a face value — the text never stated. A bare
+# "eagle" is deliberately absent: "silver eagle" and "gold eagle" are different
+# coins, so the word is reported unrecognized rather than guessed.
 _DENOMINATIONS: list[tuple[str, str]] = [
     ("half dollar", "half dollar"),
+    ("quarter eagle", "quarter eagle"),
+    ("double eagle", "double eagle"),
+    ("half eagle", "half eagle"),
+    ("half dime", "half dime"),
+    ("half cent", "half cent"),
+    ("twenty cent", "twenty cent"),
+    ("three cent", "three cent"),
+    ("two cent", "two cent"),
     ("half", "half dollar"),
     ("dollar", "dollar"),
     ("quarter", "quarter"),
@@ -103,26 +118,57 @@ _FILLER_WORDS = {
 
 _YEAR_WORD_RE = re.compile(r"\b(1[5-9]\d\d|20\d\d)\b")
 _YEAR_MINT_RE = re.compile(r"\b(1[5-9]\d\d|20\d\d)-([a-z]{1,2})\b")
-# "$4", "$1,234.56", or "paid/cost 4.50". The paid/cost-keyword branch is tried
-# first so the span covers the whole "paid $4" phrase; a bare "$" amount is
-# still matched on its own.
-_MONEY_RE = re.compile(
-    r"(?:\b(?:paid|cost)\s+\$?\s*(?P<kw>\d[\d,]*(?:\.\d{1,2})?))"
-    r"|(?:\$\s*(?P<dollar>\d[\d,]*(?:\.\d{1,2})?))"
-)
+# "paid/cost 4.50" (an explicit statement of what was paid) and a bare "$4".
+_AMOUNT = r"\d[\d,]*(?:\.\d{1,2})?"
+_PAID_RE = re.compile(r"\b(?:paid|cost)\s+\$?\s*(?P<amt>" + _AMOUNT + r")")
+_DOLLAR_RE = re.compile(r"\$\s*(?P<amt>" + _AMOUNT + r")")
 
 
-def _extract_money(text: str) -> tuple[int | None, str | None, Span | None]:
-    """Return (cents, unresolved_fragment, span). The span is masked before
-    year parsing so a "$1943" price is never mistaken for a year."""
-    m = _MONEY_RE.search(text)
-    if m is None:
-        return None, None, None
-    raw = m.group("kw") if m.group("kw") is not None else m.group("dollar")
+def _extract_money(
+    text: str,
+) -> tuple[int | None, str | None, list[Span], list[Span]]:
+    """Return (cents, unresolved_fragment, consumed_spans, money_spans).
+
+    ``money_spans`` covers EVERY money-looking token and is masked before year
+    parsing, so a "$1943" price is never mistaken for a year.
+
+    Which amount is the cost basis:
+
+    - An explicit "paid X" / "cost X" always wins — the text says so.
+    - Otherwise a lone "$X" is taken as the price paid.
+    - Several bare "$" amounts with no paid/cost keyword are AMBIGUOUS (a
+      "$20 gold piece" names a denomination, not a price): nothing is stored
+      and the amounts are reported unresolved rather than picking the first.
+
+    A "$" amount that was not used stays unconsumed, so the residual pass
+    echoes it back as unrecognized.
+    """
+    paid = list(_PAID_RE.finditer(text))
+    paid_spans = [m.span() for m in paid]
+    bare = [
+        m
+        for m in _DOLLAR_RE.finditer(text)
+        if not any(ps <= m.start() < pe for ps, pe in paid_spans)
+    ]
+    all_spans = paid_spans + [m.span() for m in bare]
+
+    if len(paid) == 1:
+        chosen = paid[0]
+    elif not paid and len(bare) == 1:
+        chosen = bare[0]
+    elif not paid and not bare:
+        return None, None, [], []
+    else:
+        ambiguous = paid if paid else bare
+        fragment = "ambiguous amounts: " + ", ".join(
+            m.group(0).strip() for m in ambiguous
+        )
+        return None, fragment, [m.span() for m in ambiguous], all_spans
+
     try:
-        return _money_to_cents(raw), None, m.span()
+        return _money_to_cents(chosen.group("amt")), None, [chosen.span()], all_spans
     except ValueError:
-        return None, m.group(0).strip(), m.span()
+        return None, chosen.group(0).strip(), [chosen.span()], all_spans
 
 
 def _match_series(
@@ -180,9 +226,16 @@ def _extract_year_and_mint(
                 (t.group(0), t.span())
                 for t in re.finditer(r"[a-z]+|\d{3,4}", text_lower)
             ]
+            # Only whitespace may separate them: "1943's" is a possessive, not
+            # a 1943-S.
             for i, (_tok, sp) in enumerate(tokens):
                 if sp == yw.span():
-                    if i + 1 < len(tokens) and tokens[i + 1][0] in _MINT_LOWER:
+                    if (
+                        i + 1 < len(tokens)
+                        and tokens[i + 1][0] in _MINT_LOWER
+                        and text_lower[sp[1] : tokens[i + 1][1][0]].strip() == ""
+                        and sp[1] < tokens[i + 1][1][0]
+                    ):
                         mintmark = tokens[i + 1][0].upper()
                         spans.append(tokens[i + 1][1])
                     break
@@ -214,31 +267,44 @@ def _certain_composition(
       impossible combination — the user likely misspoke — so composition stays
       null and is listed unresolved. (1944 steel-planchet errors are collector
       exotica and deliberately NOT encoded.)
-    - Morgan dollar 1878-1921 -> 90% silver dollar (.900 fine for the whole
-      classic run). Peace dollar 1921-1935 likewise. Modern (2021+) Morgan/Peace
-      commemoratives are .999 fine, so the year gate is REQUIRED for certainty.
+    - Morgan dollar 1878-1904 or 1921 -> 90% silver dollar (.900 fine for the
+      whole classic run). Peace dollar 1921-1928 or 1934-1935 likewise. Modern
+      (2021+) Morgan/Peace commemoratives are .999 fine, so the year gate is
+      REQUIRED for certainty — and it follows the years actually struck (the
+      same years the shipped set manifests list): a "1910 Morgan" or "1930
+      Peace" does not exist, so the year or the series was mis-stated and a
+      melt-valued composition must not be attached to it.
     """
     if has_steel_kw:
         if year is None or year == 1943:
             return "Steel cent", False
         return None, True
     if series == "Morgan Dollar":
-        if year is not None and 1878 <= year <= 1921:
+        if year is not None and (1878 <= year <= 1904 or year == 1921):
             return "90% silver dollar", False
         return None, True
     if series == "Peace Dollar":
-        if year is not None and 1921 <= year <= 1935:
+        if year is not None and (1921 <= year <= 1928 or 1934 <= year <= 1935):
             return "90% silver dollar", False
         return None, True
     return None, False
 
 
+# Anchored on the location-kind words themselves. Scanning generic
+# "<word> <word>" pairs instead would let an unrelated word swallow the kind
+# ("in box 3 slot 12" pairs up as "in box" + "slot 12"), silently dropping
+# "box 3" — and the coin would then be filed under whatever other box happens
+# to own the only "slot 12".
+_LOCATION_PAIR_RE = re.compile(
+    r"\b(" + "|".join(sorted(_LOCATION_KINDS)) + r")\s+([a-z0-9][a-z0-9-]*)\b"
+)
+
+
 def _parse_location_pairs(lowered: str) -> list[tuple[str, str, Span]]:
-    pairs: list[tuple[str, str, Span]] = []
-    for m in re.finditer(r"\b([a-z]+)\s+([a-z0-9][a-z0-9-]*)\b", lowered):
-        if m.group(1) in _LOCATION_KINDS:
-            pairs.append((m.group(1), m.group(2), m.span()))
-    return pairs
+    return [
+        (m.group(1), m.group(2), m.span())
+        for m in _LOCATION_PAIR_RE.finditer(lowered)
+    ]
 
 
 def _resolve_location(
@@ -357,17 +423,17 @@ def parse_quick_add(
     unresolved: list[str] = []
     consumed: list[Span] = []
 
-    # Money first, then mask its span so a "$1943" is not read as a year.
-    cents, money_unresolved, money_span = _extract_money(lowered)
+    # Money first, then mask every money-looking span so a "$1943" is not read
+    # as a year.
+    cents, money_unresolved, money_consumed, money_spans = _extract_money(lowered)
     if cents is not None:
         parsed["cost_basis_cents"] = cents
     if money_unresolved is not None:
         unresolved.append(money_unresolved)
+    consumed.extend(money_consumed)
     year_source = lowered
-    if money_span is not None:
-        consumed.append(money_span)
-        start, end = money_span
-        year_source = lowered[:start] + " " * (end - start) + lowered[end:]
+    for start, end in money_spans:
+        year_source = year_source[:start] + " " * (end - start) + year_source[end:]
 
     # Series (also merges distinct manifest series names).
     series, series_phrase, series_span = _match_series(lowered, series_names)
