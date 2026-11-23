@@ -286,3 +286,39 @@ def test_melt_delta_pct(ledger):
     assert result["XAG"]["latest_cents"] == 6300
     assert result["XAG"]["prior_cents"] == 6000
     assert result["XAG"]["pct"] == pytest.approx(5.0)
+
+
+def test_sold_and_discarded_coins_are_not_holdings_for_melt(ledger):
+    """Melt recompute and portfolio rollups cover holdings only.
+
+    Regression: a sold melt-basis coin kept being repriced from spot every day
+    and kept counting toward portfolio melt / estimated value.
+    """
+    comp_id = _silver_dollar_comp_id(ledger.conn)
+    _insert_spot(ledger.conn, "XAG", 3000)
+    kept = ledger.add_coin(composition_id=comp_id, value_basis="melt")
+    sold = ledger.add_coin(composition_id=comp_id, value_basis="melt")
+    tossed = ledger.add_coin(
+        composition_id=comp_id, value_basis="numismatic", value_est_cents=9999
+    )
+    update_melt_values(ledger.conn)
+    sold_value_at_sale = ledger.get_coin(sold)["value_est_cents"]
+    ledger.set_disposition(sold, "sold", sold_price_cents=2500)
+    ledger.set_disposition(tossed, "discarded")
+
+    _insert_spot(ledger.conn, "XAG", 4000)
+    summary = update_melt_values(ledger.conn)
+
+    assert [u["accession"] for u in summary["updated"]] == [kept]
+    assert ledger.get_coin(sold)["value_est_cents"] == sold_value_at_sale
+    # The +33% spot move flags no coin that has left the collection.
+    assert summary["stale_marked"] == []
+    assert ledger.get_coin(tossed)["stale_since"] is None
+
+    one_dollar_melt = round(0.77344 * 4000)
+    assert portfolio_melt(ledger.conn)["total_cents"] == one_dollar_melt
+    pv = melt.portfolio_value(ledger.conn)
+    assert pv["value_est_total_cents"] == one_dollar_melt
+    assert pv["value_est_by_basis"] == {
+        "melt": {"count": 1, "value_cents": one_dollar_melt}
+    }

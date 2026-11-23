@@ -12,6 +12,8 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from .ledger import HELD_SQL
+
 _log = logging.getLogger(__name__)
 
 METALS = frozenset({"XAU", "XAG", "XPT"})
@@ -277,6 +279,13 @@ def _primary_spot_move(conn: sqlite3.Connection, metal: str) -> float | None:
 
 
 def update_melt_values(conn: sqlite3.Connection) -> dict:
+    """Reprice melt-basis holdings from stored spot; flag spot-move staleness.
+
+    Only HELD coins (owned / for_sale) are touched. A sold or discarded coin's
+    row is frozen at whatever it held when it left the collection — repricing
+    it daily, or flagging it stale, would keep a coin that is gone in the
+    numbers.
+    """
     updated: list[dict] = []
     hybrid_floors: list[dict] = []
     skipped_no_spot: list[str] = []
@@ -284,7 +293,7 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
     stale_marked: list[dict] = []
 
     rows = conn.execute(
-        """
+        f"""
         SELECT
             c.accession_no,
             c.value_basis,
@@ -293,6 +302,7 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
         FROM coins c
         INNER JOIN compositions comp ON c.composition_id = comp.id
         WHERE comp.precious_weight_ozt IS NOT NULL
+          AND {HELD_SQL.format(alias="c.")}
         ORDER BY c.accession_no
         """
     ).fetchall()
@@ -352,9 +362,10 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
                 continue
             reason = f"spot {metal} moved {move:+.1f}%"
             affected = conn.execute(
-                """
+                f"""
                 SELECT accession_no, stale_since FROM coins
                 WHERE value_basis IN ('hybrid', 'numismatic')
+                  AND {HELD_SQL.format(alias="")}
                   AND composition_id IN (
                     SELECT id FROM compositions WHERE metal = ?
                   )
@@ -365,9 +376,10 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
             if not affected:
                 continue
             conn.execute(
-                """
+                f"""
                 UPDATE coins SET stale_since = ?, stale_reason = ?
                 WHERE value_basis IN ('hybrid', 'numismatic')
+                  AND {HELD_SQL.format(alias="")}
                   AND composition_id IN (
                     SELECT id FROM compositions WHERE metal = ?
                   )
@@ -393,8 +405,9 @@ def update_melt_values(conn: sqlite3.Connection) -> dict:
 
 
 def portfolio_melt(conn: sqlite3.Connection) -> dict:
+    """Melt value of current holdings (owned / for_sale), total and per metal."""
     rows = conn.execute(
-        """
+        f"""
         SELECT
             comp.metal AS metal,
             SUM(ROUND(comp.precious_weight_ozt * sp.price_usd_cents)) AS melt_cents
@@ -404,6 +417,7 @@ def portfolio_melt(conn: sqlite3.Connection) -> dict:
             ON sp.metal = comp.metal AND sp.source = ?
         WHERE comp.precious_weight_ozt IS NOT NULL
           AND comp.metal IS NOT NULL
+          AND {HELD_SQL.format(alias="c.")}
           AND sp.id = (
             SELECT id FROM spot_prices
             WHERE metal = comp.metal AND source = ?
@@ -427,14 +441,16 @@ def portfolio_value(conn: sqlite3.Connection) -> dict:
 
     Pure read aggregation. ``melt`` reuses :func:`portfolio_melt`; the estimated
     numismatic/hybrid value is summed from ``coins.value_est_cents`` grouped by
-    ``value_basis`` (a NULL basis is bucketed as ``"unspecified"``).
+    ``value_basis`` (a NULL basis is bucketed as ``"unspecified"``). Holdings
+    only: sold/discarded coins are realized (see report.realized_summary) and
+    never count toward what the collection is worth today.
     """
     melt = portfolio_melt(conn)
     rows = conn.execute(
-        """
+        f"""
         SELECT value_basis, COUNT(*) AS n, COALESCE(SUM(value_est_cents), 0) AS s
         FROM coins
-        WHERE value_est_cents IS NOT NULL
+        WHERE value_est_cents IS NOT NULL AND {HELD_SQL.format(alias="")}
         GROUP BY value_basis
         """
     ).fetchall()

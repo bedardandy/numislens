@@ -194,3 +194,23 @@ def test_spot_first_row_no_prior_no_trigger(ledger):
     summary = update_melt_values(ledger.conn)
     assert ledger.get_coin(hybrid_coin)["stale_since"] is None
     assert summary["stale_marked"] == []
+
+
+# --- holdings only ----------------------------------------------------------
+
+
+def test_watch_surfaces_cover_holdings_only(ledger):
+    """Sold/discarded coins drop out of the watchlist, stale list and sweeps."""
+    held = ledger.add_coin(series="Morgan Dollar", year=1921, value_est_cents=5000)
+    sold = ledger.add_coin(series="Morgan Dollar", year=1893, value_est_cents=900000)
+    tossed = ledger.add_coin(series="Morgan Dollar", year=1904, value_est_cents=7000)
+    ledger.mark_stale(accessions=[held, sold, tossed], reason="auction record")
+    ledger.set_disposition(sold, "sold", sold_price_cents=950000)
+    ledger.set_disposition(tossed, "discarded")
+
+    assert [c["accession_no"] for c in ledger.watchlist(25)] == [held]
+    assert [c["accession_no"] for c in ledger.list_stale()] == [held]
+    # A series sweep counts (and marks) only what is still in the collection.
+    assert ledger.mark_stale(series="morgan dollar", reason="digest") == 1
+    assert ledger.get_coin(sold)["stale_reason"] == "auction record"
+    assert ledger.get_coin(held)["stale_reason"] == "digest"

@@ -14,6 +14,13 @@ GRADE_SOURCES = frozenset({"local-vlm", "cross-vote", "cloud", "human", "tpg"})
 VALUE_BASES = frozenset({"melt", "numismatic", "hybrid"})
 IMAGE_KINDS = frozenset({"obverse", "reverse", "edge", "slab"})
 DISPOSITIONS = frozenset({"owned", "for_sale", "sold", "discarded"})
+# Dispositions that are still part of the collection. A sold or discarded coin
+# keeps its row and audit trail forever, but it is no longer a HOLDING: it must
+# not count toward any current valuation, watchlist, or staleness sweep.
+HELD_DISPOSITIONS = ("owned", "for_sale")
+# SQL predicate for "this coin is still held". Literals only (no user input);
+# qualify with a table alias via HELD_SQL.format(alias="c.").
+HELD_SQL = "{alias}disposition IN ('owned', 'for_sale')"
 
 
 class LedgerError(Exception):
@@ -931,6 +938,10 @@ class Ledger:
         - ``set_id``: numeric id or set_key; marks every coin assigned to a slot
           of that set.
 
+        The ``series`` and ``set_id`` sweeps mark only coins still HELD (owned
+        or for_sale): a sold/discarded coin has no value left to re-appraise.
+        An explicit ``accessions`` list is honored as given.
+
         ``reason`` is required and stored verbatim in ``stale_reason``. Marking
         refreshes ``stale_since`` to now and overwrites any prior reason. This
         never touches ``value_est_cents``.
@@ -957,7 +968,9 @@ class Ledger:
             coin_ids = [
                 row["id"]
                 for row in self.conn.execute(
-                    "SELECT id FROM coins WHERE series = ?", (match,)
+                    "SELECT id FROM coins WHERE series = ? AND "
+                    + HELD_SQL.format(alias=""),
+                    (match,),
                 ).fetchall()
             ]
         else:
@@ -965,7 +978,9 @@ class Ledger:
             coin_ids = [
                 row["coin_id"]
                 for row in self.conn.execute(
-                    "SELECT coin_id FROM set_slots WHERE set_id = ? AND coin_id IS NOT NULL",
+                    "SELECT s.coin_id FROM set_slots s "
+                    "INNER JOIN coins c ON c.id = s.coin_id "
+                    "WHERE s.set_id = ? AND " + HELD_SQL.format(alias="c."),
                     (resolved_set_id,),
                 ).fetchall()
             ]
@@ -975,11 +990,16 @@ class Ledger:
             return self._mark_coin_ids_stale(coin_ids, reason, now)
 
     def list_stale(self) -> list[dict]:
-        """All currently-stale coins (full rows), newest staleness first."""
+        """Currently-stale HELD coins (full rows), newest staleness first.
+
+        Sold/discarded coins are excluded: staleness is a re-appraisal TODO,
+        and there is nothing left to re-appraise once a coin has left the
+        collection.
+        """
         rows = self.conn.execute(
-            """
+            f"""
             SELECT * FROM coins
-            WHERE stale_since IS NOT NULL
+            WHERE stale_since IS NOT NULL AND {HELD_SQL.format(alias="")}
             ORDER BY stale_since DESC, accession_no
             """
         ).fetchall()
@@ -989,15 +1009,16 @@ class Ledger:
         """Top-``n`` coins by value_est_cents (ties by accession).
 
         Coins with a NULL value are EXCLUDED — an unappraised coin is not
-        watchable, it is simply unpriced. This is the monthly per-coin sweep
-        candidate set.
+        watchable, it is simply unpriced. Sold/discarded coins are excluded
+        too: only holdings are worth a market check. This is the monthly
+        per-coin sweep candidate set.
         """
         if n < 0:
             raise ValueError("watchlist n must be non-negative")
         rows = self.conn.execute(
-            """
+            f"""
             SELECT * FROM coins
-            WHERE value_est_cents IS NOT NULL
+            WHERE value_est_cents IS NOT NULL AND {HELD_SQL.format(alias="")}
             ORDER BY value_est_cents DESC, accession_no
             LIMIT ?
             """,
