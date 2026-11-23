@@ -656,3 +656,67 @@ def test_record_appraisal_source_url_is_optional(ledger):
     accession = ledger.add_coin()
     ledger.record_appraisal(accession, "human", value_cents=100)
     assert ledger.list_appraisals(accession)[0]["source_url"] is None
+
+
+# --- import_coins: one transaction for many coins --------------------------
+
+
+def test_import_coins_creates_rows_events_and_dispositions(ledger):
+    box = ledger.create_location("box", "A")
+    created = ledger.import_coins(
+        [
+            {"series": "Morgan Dollar", "year": 1885, "location_id": box},
+            {
+                "series": "Peace Dollar",
+                "year": 1922,
+                "disposition": "sold",
+                "sold_price_cents": 2500,
+                "sold_venue": "show",
+            },
+        ]
+    )
+    assert len(created) == 2
+    first, second = (ledger.get_coin(a) for a in created)
+    assert first["country"] == "US" and first["location_id"] == box
+    assert first["disposition"] == "owned"
+    assert second["disposition"] == "sold"
+    assert second["sold_price_cents"] == 2500
+    events = [
+        (r["event_type"], r["detail"])
+        for r in ledger.conn.execute(
+            "SELECT event_type, detail FROM events WHERE coin_id = ? ORDER BY id",
+            (second["id"],),
+        )
+    ]
+    assert [e[0] for e in events] == ["added", "disposition"]
+    assert '"from": "owned"' in events[1][1] and '"to": "sold"' in events[1][1]
+
+
+def test_import_coins_is_all_or_nothing(ledger):
+    ledger.add_coin(series="Existing")
+    count = lambda: ledger.conn.execute("SELECT COUNT(*) FROM coins").fetchone()[0]
+    events = lambda: ledger.conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+    before = (count(), events())
+
+    # Fails validation on the second row: nothing written.
+    with pytest.raises(ValueError, match="coin 2"):
+        ledger.import_coins(
+            [{"series": "A"}, {"series": "B", "grade_bucket": "MS70"}]
+        )
+    # Sold without a price, unknown location, unknown field: same.
+    with pytest.raises(ValueError, match="sold_price_cents"):
+        ledger.import_coins([{"series": "A"}, {"series": "B", "disposition": "sold"}])
+    with pytest.raises(ValueError, match="location not found"):
+        ledger.import_coins([{"series": "A"}, {"series": "B", "location_id": 999}])
+    with pytest.raises(ValueError, match="unknown coin fields"):
+        ledger.import_coins([{"series": "A", "mint": "D"}])
+    assert (count(), events()) == before
+
+    # Fails at the database on the third row: the first two are rolled back.
+    with pytest.raises(OverflowError):
+        ledger.import_coins(
+            [{"series": "A"}, {"series": "B"}, {"series": "C", "year": 10**30}]
+        )
+    assert (count(), events()) == before
+    # ...and the connection is usable afterwards.
+    assert ledger.add_coin(series="After") == "NL-000002"

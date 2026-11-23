@@ -194,3 +194,57 @@ def test_spot_first_row_no_prior_no_trigger(ledger):
     summary = update_melt_values(ledger.conn)
     assert ledger.get_coin(hybrid_coin)["stale_since"] is None
     assert summary["stale_marked"] == []
+
+
+# --- holdings only ----------------------------------------------------------
+
+
+def test_watch_surfaces_cover_holdings_only(ledger):
+    """Sold/discarded coins drop out of the watchlist, stale list and sweeps."""
+    held = ledger.add_coin(series="Morgan Dollar", year=1921, value_est_cents=5000)
+    sold = ledger.add_coin(series="Morgan Dollar", year=1893, value_est_cents=900000)
+    tossed = ledger.add_coin(series="Morgan Dollar", year=1904, value_est_cents=7000)
+    ledger.mark_stale(accessions=[held, sold, tossed], reason="auction record")
+    ledger.set_disposition(sold, "sold", sold_price_cents=950000)
+    ledger.set_disposition(tossed, "discarded")
+
+    assert [c["accession_no"] for c in ledger.watchlist(25)] == [held]
+    assert [c["accession_no"] for c in ledger.list_stale()] == [held]
+    # A series sweep counts (and marks) only what is still in the collection.
+    assert ledger.mark_stale(series="morgan dollar", reason="digest") == 1
+    assert ledger.get_coin(sold)["stale_reason"] == "auction record"
+    assert ledger.get_coin(held)["stale_reason"] == "digest"
+
+
+def test_spot_move_does_not_reflag_a_coin_appraised_after_the_move(ledger):
+    """The >=10% trigger compares the two newest spot rows, so it stays hot
+    until a new row lands. A run with no new row (e.g. the spot fetch failed)
+    must not undo an appraisal recorded in answer to that very move."""
+    comp_id = _silver_dollar_comp_id(ledger.conn)
+    answered = ledger.add_coin(
+        composition_id=comp_id, value_basis="numismatic", value_est_cents=50000
+    )
+    pending = ledger.add_coin(
+        composition_id=comp_id, value_basis="numismatic", value_est_cents=60000
+    )
+    _insert_spot(ledger.conn, "XAG", 3000, fetched_at="2026-01-01T00:00:00+00:00")
+    _insert_spot(ledger.conn, "XAG", 3500, fetched_at="2026-01-02T00:00:00+00:00")
+
+    first = update_melt_values(ledger.conn)
+    assert {s["accession"] for s in first["stale_marked"]} == {answered, pending}
+
+    ledger.record_appraisal(answered, "human", value_cents=52000)
+    assert ledger.get_coin(answered)["stale_since"] is None
+
+    # Next run, no new spot row: only the still-unanswered coin is flagged,
+    # and it is not reported as newly stale.
+    second = update_melt_values(ledger.conn)
+    assert second["stale_marked"] == [
+        {"accession": pending, "reason": "spot XAG moved +16.7%", "newly": False}
+    ]
+    assert ledger.get_coin(answered)["stale_since"] is None
+
+    # A fresh >=10% move after that appraisal flags it again.
+    _insert_spot(ledger.conn, "XAG", 4200, fetched_at="2999-01-01T00:00:00+00:00")
+    third = update_melt_values(ledger.conn)
+    assert {s["accession"] for s in third["stale_marked"]} == {answered, pending}

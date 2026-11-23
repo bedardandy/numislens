@@ -214,3 +214,101 @@ def test_unknown_field_rejected_422(client, auth_headers):
         headers=auth_headers,
     )
     assert resp.status_code == 422
+
+
+# --- regressions: facts the text never stated ------------------------------
+
+
+def test_location_kind_survives_a_preceding_word(client, auth_headers):
+    """ "in box 3 slot 12" used to pair up as "in box" + "slot 12", dropping
+    "box 3" — so the coin was filed under a DIFFERENT box that happened to own
+    the only slot 12. The location must resolve to what was said, or not at all.
+    """
+    _make_location(client, auth_headers, "box", "3")  # has no slot 12
+    box5 = _make_location(client, auth_headers, "box", "5")
+    slot12 = _make_location(client, auth_headers, "slot", "12", parent_id=box5)
+
+    resp = _quick(client, auth_headers, "1943 steel cent in box 3 slot 12")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "location_id" not in body["parsed"]
+    assert "box 3 slot 12" in body["unresolved"]
+    assert body["coin"]["location_id"] is None
+
+    resp = _quick(client, auth_headers, "1943 steel cent in box 5 slot 12")
+    body = resp.json()
+    assert body["parsed"]["location_id"] == slot12
+    assert body["unresolved"] == []
+
+
+def test_single_location_after_a_preposition_resolves(client, auth_headers):
+    tray = _make_location(client, auth_headers, "tray", "2")
+    resp = _quick(client, auth_headers, "1885 Morgan dollar in tray 2")
+    body = resp.json()
+    assert body["parsed"]["location_id"] == tray
+    assert body["unresolved"] == []
+
+
+def test_compound_denominations_are_not_read_as_their_first_word(
+    client, auth_headers
+):
+    cases = {
+        "1881 half eagle": "half eagle",
+        "1857 half dime": "half dime",
+        "1804 half cent": "half cent",
+        "1907 quarter eagle": "quarter eagle",
+        "1924 double eagle": "double eagle",
+        "1865 three cent nickel": "three cent",
+        "1964 kennedy half": "half dollar",
+    }
+    for text, expected in cases.items():
+        body = _quick(client, auth_headers, text).json()
+        assert body["parsed"]["denomination"] == expected, text
+
+
+def test_bare_eagle_is_reported_not_guessed(client, auth_headers):
+    body = _quick(client, auth_headers, "1986 silver eagle").json()
+    assert "denomination" not in body["parsed"]
+    assert 'unrecognized: "silver eagle"' in body["unresolved"]
+
+
+def test_paid_amount_wins_over_a_denomination_dollar_sign(client, auth_headers):
+    # "$20" names the coin; "paid $2,100" is the cost.
+    body = _quick(
+        client, auth_headers, "1924 $20 gold double eagle, paid $2,100"
+    ).json()
+    assert body["parsed"]["cost_basis_cents"] == 210000
+    assert body["parsed"]["year"] == 1924
+    assert 'unrecognized: "$20 gold"' in body["unresolved"]
+
+
+def test_several_bare_dollar_amounts_are_ambiguous(client, auth_headers):
+    body = _quick(client, auth_headers, "1924 $20 gold piece $2,100").json()
+    assert "cost_basis_cents" not in body["parsed"]
+    assert "ambiguous amounts: $20, $2,100" in body["unresolved"]
+    assert body["coin"]["cost_basis_cents"] is None
+
+
+def test_dollar_amount_that_looks_like_a_year_is_never_the_year(
+    client, auth_headers
+):
+    body = _quick(client, auth_headers, "morgan dollar $1921 paid $1900").json()
+    assert "year" not in body["parsed"]
+    assert body["parsed"]["cost_basis_cents"] == 190000
+
+
+def test_silver_composition_follows_years_actually_struck(client, auth_headers):
+    for text in ("1910 Morgan dollar", "1930 Peace dollar"):
+        body = _quick(client, auth_headers, text).json()
+        assert "composition_id" not in body["parsed"], text
+        assert "value_basis" not in body["parsed"], text
+        assert "composition" in body["unresolved"], text
+    for text in ("1904 Morgan dollar", "1921 Morgan dollar", "1934 Peace dollar"):
+        body = _quick(client, auth_headers, text).json()
+        assert "composition_id" in body["parsed"], text
+
+
+def test_possessive_year_is_not_an_s_mint(client, auth_headers):
+    body = _quick(client, auth_headers, "1943's steel cent").json()
+    assert "mintmark" not in body["parsed"]
+    assert 'unrecognized: "s"' in body["unresolved"]

@@ -13,6 +13,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from . import melt
+from .ledger import HELD_SQL
 from .reference import ReferenceSet, load_references
 
 # US face values in cents, keyed by lowercased denomination. US coins only.
@@ -112,11 +113,17 @@ def build_appraisal_report(
     The report also carries an appraisal WORKLIST: owned coins whose
     identity matches a notable reference entry but whose current best value
     falls short of it — the "what deserves eyes first" triage list.
+
+    Every count, total and grouping covers HOLDINGS only (owned / for_sale).
+    Sold and discarded coins are out of the collection: they appear solely in
+    ``realized`` (sold) and in ``totals.disposed_count`` (disclosed, never
+    hidden) — otherwise a sold coin would be counted twice, once as realized
+    proceeds and again as unrealized value.
     """
     if references is None:
         references = load_references()
     coins = conn.execute(
-        """
+        f"""
         SELECT
             c.id AS id,
             c.accession_no AS accession_no,
@@ -138,9 +145,13 @@ def build_appraisal_report(
             comp.precious_weight_ozt AS ozt
         FROM coins c
         LEFT JOIN compositions comp ON c.composition_id = comp.id
+        WHERE {HELD_SQL.format(alias="c.")}
         ORDER BY c.accession_no
         """
     ).fetchall()
+    disposed_count = conn.execute(
+        f"SELECT COUNT(*) FROM coins WHERE NOT {HELD_SQL.format(alias='')}"
+    ).fetchone()[0]
 
     # Snapshot the locations table once for in-Python path reconstruction.
     loc_map = {
@@ -453,8 +464,6 @@ def build_appraisal_report(
     # coin lands within it); it is an attention signal, never a value.
     worklist: list[dict] = []
     for row in coins:
-        if row["disposition"] in ("sold", "discarded"):
-            continue
         if not row["series"] or row["year"] is None:
             continue
         attention = references.notable_value(
@@ -488,6 +497,7 @@ def build_appraisal_report(
         "references": references.sources(),
         "totals": {
             "coin_count": coin_count,
+            "disposed_count": disposed_count,
             "valued_count": valued_count,
             "unvalued_count": unvalued_count,
             "best_total_cents": best_total,

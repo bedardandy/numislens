@@ -98,24 +98,20 @@ def import_coins_csv(ldb: LedgerDep, file: UploadFile) -> dict:
             detail={"message": str(exc), "errors": exc.errors},
         ) from exc
 
-    created: list[str] = []
+    # One transaction for the whole file (Ledger.import_coins): a failure on
+    # any row — including one only the database can detect, such as an integer
+    # too large to store — leaves the ledger exactly as it was. Looping over
+    # add_coin here would commit row by row and break the all-or-nothing
+    # contract the moment a later row failed.
     try:
-        for fields in batches:
-            # Disposition is applied via the lifecycle API after creation —
-            # it keeps its own validation and writes its own event.
-            sold_fields = {
-                k: fields.pop(k)
-                for k in ("sold_date", "sold_price_cents", "sold_venue")
-                if k in fields
-            }
-            disposition = fields.pop("disposition", None)
-            accession = ldb.add_coin(**fields)
-            if disposition is not None:
-                ldb.set_disposition(
-                    accession, disposition, **sold_fields
-                )
-            created.append(accession)
-    except ValueError as exc:  # defensive: csvio pre-validates everything above
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        created = ldb.import_coins(batches)
+    except (ValueError, OverflowError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "import rejected: nothing was created",
+                "errors": [str(exc)],
+            },
+        ) from exc
 
     return {"created": created, "count": len(created)}

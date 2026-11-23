@@ -103,3 +103,59 @@ def test_country_us_variants():
     assert canon.canon_country("United States of America") == "US"
     assert canon.canon_country("USA") == "US"
     assert canon.canon_country("Canada") is None
+
+
+# --- a hedge, refusal or ambiguity is never a reading ----------------------
+
+
+def test_grade_refusal_is_not_a_grade():
+    for text in (
+        "The image is not good enough to determine the grade",
+        "Cannot determine, e.g. due to glare",
+        "Unclear - too much glare to judge wear",
+        "XF. Not quite about uncirculated.",
+    ):
+        assert canon.canon_grade(text) is None, text
+
+
+def test_grade_with_two_buckets_is_ambiguous():
+    assert canon.canon_grade("VF. Good eye appeal.") is None
+    assert canon.canon_grade("XF - fine hairlines on the cheek") is None
+    assert canon.canon_grade("VF to XF") is None
+
+
+def test_grade_ladder_echo_still_canonicalizes():
+    # The model often echoes the prompt's own ladder gloss.
+    assert canon.canon_grade("G (heavy wear, outlines only)") == "G"
+    assert canon.canon_grade("UNC (no wear)") == "UNC"
+    assert canon.canon_grade("About Uncirculated") == "AU"
+    assert canon.canon_grade("MS-63") == "UNC"
+
+
+def test_year_with_an_unclear_digit_is_none():
+    assert canon.parse_year_digits(
+        "first digit: 1, second digit: 9, third digit: unclear (4 or 9), "
+        "fourth digit: 3"
+    ) is None
+    assert canon.parse_year_digits("1 9 unclear 2 1") is None
+
+
+def test_year_ignores_long_digit_runs_and_rejects_two_dates():
+    assert canon.parse_year_digits("PCGS 4019432055 MS64 1881 S") == 1881
+    assert canon.parse_year_digits("1776-1976") is None
+    assert canon.parse_year_digits("digits 1, 9, 4, 3. The year is 1943.") == 1943
+
+
+def test_ocr_year_is_a_standalone_token_and_unique():
+    assert canon.find_year_in_text("LIBERTY 1943 IN GOD WE TRUST") == 1943
+    assert canon.find_year_in_text("CERT 4019432055") is None
+    assert canon.find_year_in_text("UNITED STATES 1776-1976 QUARTER DOLLAR") is None
+    assert canon.find_year_in_text("DELAWARE 1787 THE FIRST STATE 1999") is None
+
+
+def test_mintmark_possessive_and_hedges_are_not_letters():
+    assert canon.canon_mintmark("This coin's mintmark is unclear.") == (None, None)
+    assert canon.canon_mintmark("Mintmark: S or D") == (None, None)
+    assert canon.canon_mintmark("The coin's mintmark is O") == (True, "O")
+    assert canon.canon_mintmark("Mintmark: D") == (True, "D")
+    assert canon.canon_mintmark("Mintmark: none") == (False, None)

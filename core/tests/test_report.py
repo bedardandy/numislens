@@ -473,3 +473,53 @@ def test_worklist_clears_once_reference_value_applies(ledger):
     entry = next(w for w in work if w["accession_no"] == accession)
     assert entry["current_best_cents"] == 18000
     assert entry["gap_cents"] == 120000 - 18000
+
+
+def test_sold_and_discarded_coins_leave_every_holdings_total(ledger):
+    """A coin that left the collection is realized (or gone), never unrealized.
+
+    Regression: sold/discarded coins used to stay in coin_count, best/grand
+    totals, the unrealized gain, highlights and every grouping — so a sale was
+    counted twice (realized proceeds AND current value).
+    """
+    comp = _comp_id(ledger.conn, "90% silver dollar")
+    _insert_spot(ledger.conn, "XAG", 6001)
+    kept = ledger.add_coin(
+        series="Morgan Dollar", year=1885, mintmark="O", denomination="dollar",
+        composition_id=comp, value_basis="melt", cost_basis_cents=2000,
+    )
+    sold = ledger.add_coin(
+        series="Morgan Dollar", year=1889, mintmark="CC", denomination="dollar",
+        composition_id=comp, value_basis="numismatic", value_est_cents=150000,
+        cost_basis_cents=50000,
+    )
+    tossed = ledger.add_coin(
+        series="Peace Dollar", year=1922, denomination="dollar",
+        value_basis="numismatic", value_est_cents=3000,
+    )
+    listed = ledger.add_coin(
+        series="Peace Dollar", year=1923, denomination="dollar",
+        value_basis="numismatic", value_est_cents=4000,
+    )
+    ledger.set_disposition(sold, "sold", sold_price_cents=160000)
+    ledger.set_disposition(tossed, "discarded")
+    ledger.set_disposition(listed, "for_sale")  # still a holding
+
+    rep = build_appraisal_report(ledger.conn)
+    totals = rep["totals"]
+    assert totals["coin_count"] == 2
+    assert totals["disposed_count"] == 2  # disclosed, not hidden
+    assert totals["valued_count"] == 2
+    assert totals["best_total_cents"] == SILVER_DOLLAR_MELT + 4000
+    assert totals["grand_total_cents"] == SILVER_DOLLAR_MELT + 4000
+    # Unrealized gain pairs only held coins that have a cost basis.
+    assert totals["paired_cost_cents"] == 2000
+    assert totals["gain_loss_cents"] == SILVER_DOLLAR_MELT - 2000
+    assert totals["cost_basis_total_cents"] == 2000
+    assert {h["accession_no"] for h in rep["highlights"]} == {kept, listed}
+    series = {g["series"]: g for g in rep["groups"]["series"]}
+    assert series["Morgan Dollar"]["count"] == 1
+    assert series["Peace Dollar"]["count"] == 1
+    # The sale itself is reported exactly once, in the realized block.
+    assert rep["realized"]["sold_count"] == 1
+    assert rep["realized"]["realized_pnl_cents"] == 110000
