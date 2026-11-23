@@ -156,6 +156,58 @@ class Ledger:
         location_id=None,
         notes=None,
     ) -> str:
+        fields = {
+            "series": series,
+            "year": year,
+            "mintmark": mintmark,
+            "denomination": denomination,
+            "country": country,
+            "composition_id": composition_id,
+            "weight_g": weight_g,
+            "diameter_mm": diameter_mm,
+            "grade_bucket": grade_bucket,
+            "grade_source": grade_source,
+            "tpg_cert": tpg_cert,
+            "cost_basis_cents": cost_basis_cents,
+            "acquired_date": acquired_date,
+            "acquired_source": acquired_source,
+            "value_est_cents": value_est_cents,
+            "value_basis": value_basis,
+            "appraisal_confidence": appraisal_confidence,
+            "location_id": location_id,
+            "notes": notes,
+        }
+        self._validate_new_coin(fields)
+        now = _utcnow()
+        self.conn.execute("PRAGMA foreign_keys = ON")
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            accession, _coin_id = self._insert_coin(fields, now)
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return accession
+
+    # Column order for a new coin row; also the full set of add_coin fields.
+    _NEW_COIN_COLUMNS = (
+        "series", "year", "mintmark", "denomination", "country",
+        "composition_id", "weight_g", "diameter_mm", "grade_bucket",
+        "grade_source", "tpg_cert", "cost_basis_cents", "acquired_date",
+        "acquired_source", "value_est_cents", "value_basis",
+        "appraisal_confidence", "location_id", "notes",
+    )
+
+    def _validate_new_coin(self, fields: dict) -> None:
+        """Every check add_coin makes, with no writes (raises ValueError /
+        LocationNotFound). Shared by add_coin and the all-or-nothing import."""
+        grade_bucket = fields.get("grade_bucket")
+        grade_source = fields.get("grade_source")
+        value_basis = fields.get("value_basis")
+        cost_basis_cents = fields.get("cost_basis_cents")
+        value_est_cents = fields.get("value_est_cents")
+        composition_id = fields.get("composition_id")
+        location_id = fields.get("location_id")
         if grade_bucket is not None and grade_bucket not in GRADE_BUCKETS:
             raise ValueError(f"invalid grade_bucket: {grade_bucket!r}")
         if grade_source is not None and grade_source not in GRADE_SOURCES:
@@ -175,67 +227,90 @@ class Ledger:
         if location_id is not None:
             self._verify_location(location_id)
 
+    def _insert_coin(self, fields: dict, now: str) -> tuple[str, int]:
+        """Insert one validated coin row plus its 'added' event.
+
+        NO transaction control: the caller holds an open write transaction and
+        owns commit/rollback. Returns ``(accession, coin_id)``.
+        """
+        row = self.conn.execute(
+            """
+            SELECT 1 + COALESCE(MAX(CAST(substr(accession_no, 4) AS INTEGER)), 0)
+            FROM coins
+            """
+        ).fetchone()
+        accession = "NL-%06d" % row[0]
+        # A row that does not mention country gets the schema default; an
+        # explicit value (including None) is stored as given.
+        values = {"country": "US", **fields}
+        columns = self._NEW_COIN_COLUMNS
+        cur = self.conn.execute(
+            f"""
+            INSERT INTO coins (accession_no, {", ".join(columns)}, created_at)
+            VALUES (?, {", ".join("?" for _ in columns)}, ?)
+            """,
+            (accession, *(values.get(c) for c in columns), now),
+        )
+        coin_id = cur.lastrowid
+        self.conn.execute(
+            """
+            INSERT INTO events (coin_id, event_type, at, detail)
+            VALUES (?, 'added', ?, ?)
+            """,
+            (coin_id, now, json.dumps(values.get("location_id"))),
+        )
+        return accession, coin_id
+
+    def import_coins(self, rows: list[dict]) -> list[str]:
+        """Create many coins ALL-OR-NOTHING; returns their accessions in order.
+
+        Each row is add_coin kwargs, optionally carrying ``disposition`` and the
+        ``sold_*`` facts. Every row is validated before anything is written, and
+        every write happens inside ONE transaction: if any row fails — at
+        validation or at the database — the ledger is exactly as it was. (The
+        per-coin add_coin/set_disposition calls each commit on their own, so a
+        loop over them can leave a half-imported collection behind an error.)
+        Each coin still gets its 'added' event, and a 'disposition' event when
+        one is given, exactly as the single-coin paths write them.
+        """
+        prepared: list[tuple[dict, dict | None]] = []
+        for index, row in enumerate(rows, start=1):
+            fields = dict(row)
+            disposition = fields.pop("disposition", None)
+            sold = {
+                "sold_date": fields.pop("sold_date", None),
+                "sold_price_cents": fields.pop("sold_price_cents", None),
+                "sold_venue": fields.pop("sold_venue", None),
+            }
+            unknown = set(fields) - set(self._NEW_COIN_COLUMNS)
+            try:
+                if unknown:
+                    raise ValueError(f"unknown coin fields: {sorted(unknown)}")
+                self._validate_new_coin(fields)
+                change = (
+                    None
+                    if disposition is None
+                    else self._validate_disposition(disposition, **sold)
+                )
+            except (LedgerError, ValueError) as exc:
+                raise ValueError(f"coin {index}: {exc}") from exc
+            prepared.append((fields, change))
+
         now = _utcnow()
+        created: list[str] = []
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("BEGIN IMMEDIATE")
         try:
-            row = self.conn.execute(
-                """
-                SELECT 1 + COALESCE(MAX(CAST(substr(accession_no, 4) AS INTEGER)), 0)
-                FROM coins
-                """
-            ).fetchone()
-            n = row[0]
-            accession = "NL-%06d" % n
-            cur = self.conn.execute(
-                """
-                INSERT INTO coins (
-                    accession_no, series, year, mintmark, denomination, country,
-                    composition_id, weight_g, diameter_mm, grade_bucket, grade_source,
-                    tpg_cert, cost_basis_cents, acquired_date, acquired_source,
-                    value_est_cents, value_basis, appraisal_confidence,
-                    location_id, notes, created_at
-                ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                )
-                """,
-                (
-                    accession,
-                    series,
-                    year,
-                    mintmark,
-                    denomination,
-                    country,
-                    composition_id,
-                    weight_g,
-                    diameter_mm,
-                    grade_bucket,
-                    grade_source,
-                    tpg_cert,
-                    cost_basis_cents,
-                    acquired_date,
-                    acquired_source,
-                    value_est_cents,
-                    value_basis,
-                    appraisal_confidence,
-                    location_id,
-                    notes,
-                    now,
-                ),
-            )
-            coin_id = cur.lastrowid
-            self.conn.execute(
-                """
-                INSERT INTO events (coin_id, event_type, at, detail)
-                VALUES (?, 'added', ?, ?)
-                """,
-                (coin_id, now, json.dumps(location_id)),
-            )
+            for fields, change in prepared:
+                accession, coin_id = self._insert_coin(fields, now)
+                if change is not None:
+                    self._apply_disposition(coin_id, "owned", change, now)
+                created.append(accession)
             self.conn.commit()
         except Exception:
             self.conn.rollback()
             raise
-        return accession
+        return created
 
     def get_coin(self, accession: str) -> dict | None:
         row = self.conn.execute(
@@ -1127,9 +1202,38 @@ class Ledger:
 
         Returns the fresh coin row.
         """
+        coin_id = self._coin_id(accession)
+        change = self._validate_disposition(
+            disposition,
+            sold_date=sold_date,
+            sold_price_cents=sold_price_cents,
+            sold_venue=sold_venue,
+        )
+        current = self.conn.execute(
+            "SELECT disposition FROM coins WHERE id = ?", (coin_id,)
+        ).fetchone()
+        now = _utcnow()
+
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            self._apply_disposition(coin_id, current["disposition"], change, now)
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return self.get_coin(accession)
+
+    @staticmethod
+    def _validate_disposition(
+        disposition: str,
+        *,
+        sold_date: str | None = None,
+        sold_price_cents: int | None = None,
+        sold_venue: str | None = None,
+    ) -> dict:
+        """Check a disposition change and return it normalized (no writes)."""
         if disposition not in DISPOSITIONS:
             raise ValueError(f"invalid disposition: {disposition!r}")
-        coin_id = self._coin_id(accession)
         if disposition == "sold":
             if sold_price_cents is None:
                 raise ValueError(
@@ -1140,39 +1244,46 @@ class Ledger:
                 raise ValueError("sold_price_cents must be an int")
         else:
             sold_date = sold_price_cents = sold_venue = None
+        return {
+            "disposition": disposition,
+            "sold_date": sold_date,
+            "sold_price_cents": sold_price_cents,
+            "sold_venue": sold_venue,
+        }
 
-        current = self.conn.execute(
-            "SELECT disposition FROM coins WHERE id = ?", (coin_id,)
-        ).fetchone()
-        previous = current["disposition"]
-        now = _utcnow()
+    def _apply_disposition(
+        self, coin_id: int, previous: str, change: dict, now: str
+    ) -> None:
+        """Write a validated disposition change plus its event.
 
-        self.conn.execute("BEGIN IMMEDIATE")
-        try:
-            self.conn.execute(
-                """
-                UPDATE coins
-                SET disposition = ?, sold_date = ?, sold_price_cents = ?, sold_venue = ?
-                WHERE id = ?
-                """,
-                (disposition, sold_date, sold_price_cents, sold_venue, coin_id),
-            )
-            detail: dict = {"from": previous, "to": disposition}
-            if disposition == "sold":
-                detail["sold"] = {
-                    "date": sold_date,
-                    "price_cents": sold_price_cents,
-                    "venue": sold_venue,
-                }
-            self.conn.execute(
-                """
-                INSERT INTO events (coin_id, event_type, at, detail)
-                VALUES (?, 'disposition', ?, ?)
-                """,
-                (coin_id, now, json.dumps(detail)),
-            )
-            self.conn.commit()
-        except Exception:
-            self.conn.rollback()
-            raise
-        return self.get_coin(accession)
+        NO transaction control: the caller holds an open write transaction.
+        """
+        disposition = change["disposition"]
+        self.conn.execute(
+            """
+            UPDATE coins
+            SET disposition = ?, sold_date = ?, sold_price_cents = ?, sold_venue = ?
+            WHERE id = ?
+            """,
+            (
+                disposition,
+                change["sold_date"],
+                change["sold_price_cents"],
+                change["sold_venue"],
+                coin_id,
+            ),
+        )
+        detail: dict = {"from": previous, "to": disposition}
+        if disposition == "sold":
+            detail["sold"] = {
+                "date": change["sold_date"],
+                "price_cents": change["sold_price_cents"],
+                "venue": change["sold_venue"],
+            }
+        self.conn.execute(
+            """
+            INSERT INTO events (coin_id, event_type, at, detail)
+            VALUES (?, 'disposition', ?, ?)
+            """,
+            (coin_id, now, json.dumps(detail)),
+        )

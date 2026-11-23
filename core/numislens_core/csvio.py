@@ -200,7 +200,9 @@ def parse_coins_csv(
             value = cells.get(col)
             if value is None:
                 continue
-            if not value.isdigit():
+            # ASCII digits only: str.isdigit() also accepts characters such
+            # as superscript digits that int() then rejects.
+            if not (value.isascii() and value.isdigit()):
                 errors.append(
                     f"{label}: {col} must be non-negative integer cents, got {value!r}"
                 )
