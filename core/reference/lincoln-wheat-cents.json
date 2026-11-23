@@ -13,14 +13,6 @@
     "notes": "Retail-guide ballparks rounded for triage, NOT sale prices. Verify before listing. 1909-S is deliberately EXCLUDED because the VDB variety splits it into two very different coins that year+mintmark cannot distinguish."
   },
   "entries": [
-    { "year": 1908, "mintmark": "S", "grade": null, "value_cents": 2500,
-      "note": "first-year semi-key; any-condition flag" },
-    { "year": 1908, "mintmark": "S", "grade": "G", "value_cents": 6500 },
-    { "year": 1908, "mintmark": "S", "grade": "F", "value_cents": 12000 },
-    { "year": 1908, "mintmark": "S", "grade": "VF", "value_cents": 18000 },
-    { "year": 1908, "mintmark": "S", "grade": "XF", "value_cents": 28000 },
-    { "year": 1908, "mintmark": "S", "grade": "UNC", "value_cents": 45000 },
-
     { "year": 1909, "mintmark": "S", "grade": null, "value_cents": 4000,
       "note": "plain 1909-S only; the rare 1909-S VDB is a separate variety this table cannot express" },
     { "year": 1909, "mintmark": "S", "grade": "G", "value_cents": 9000 },

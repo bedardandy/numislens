@@ -189,3 +189,42 @@ def test_validation_rejects_descending_ladder():
 def test_shipped_directory_is_the_default():
     assert REFERENCE_DIR.name == "reference"
     assert (REFERENCE_DIR / "reference.schema.json").is_file()
+
+
+def test_shipped_reference_identities_exist_in_the_matching_set_manifest(shipped):
+    """A value row for a coin that was never struck in its series is dead
+    data at best and a wrong flag at worst.
+
+    Where a shipped set manifest covers the same series, every reference
+    identity must be one of that manifest's date/mint slots. (This caught a
+    1908-S row — an Indian Head cent date — filed under Lincoln Wheat Cent,
+    a series that begins in 1909.) Philadelphia issues carry no mint letter
+    on the coin, so a wildcard/None reference mintmark only needs the year.
+    """
+    from numislens_core.manifests import load_manifest
+
+    sets_dir = REFERENCE_DIR.parent / "sets"
+    slots_by_series: dict[str, set[tuple[int, str]]] = {}
+    for path in sorted(sets_dir.glob("*.json")):
+        if path.name.endswith(".schema.json"):
+            continue
+        manifest = load_manifest(path)
+        series = (manifest.get("series") or "").lower()
+        slots_by_series.setdefault(series, set()).update(
+            (slot["year"], slot["mint"]) for slot in manifest["slots"]
+        )
+
+    covered = 0
+    for dataset in shipped.datasets:
+        slots = slots_by_series.get(dataset["series"].lower())
+        if slots is None:
+            continue  # no shipped manifest for this series (e.g. nickels)
+        covered += 1
+        years = {year for year, _mint in slots}
+        for entry in dataset["entries"]:
+            where = f"{dataset['id']}: {entry['year']}-{entry['mintmark']}"
+            if entry["mintmark"] is None:
+                assert entry["year"] in years, where
+            else:
+                assert (entry["year"], entry["mintmark"]) in slots, where
+    assert covered >= 2  # the cross-check really ran
