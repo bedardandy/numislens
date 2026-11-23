@@ -45,8 +45,15 @@ def create_app(
         title="NumisLens Daemon",
         version="0.1.0",
         description="Local API for the NumisLens coin collection.",
-        openapi_url="/api/v1/openapi.json",
-        docs_url="/api/v1/docs",
+        # FastAPI's built-in schema/docs routes are registered on the app
+        # itself, OUTSIDE the token-guarded router below — they would answer
+        # anyone who can reach the port (and a Funnel/tunnel makes that the
+        # internet). The spec is served from the guarded router instead, and
+        # the Swagger/ReDoc pages are off: they execute third-party CDN
+        # scripts on the same origin where the PWA keeps the bearer token.
+        openapi_url=None,
+        docs_url=None,
+        redoc_url=None,
     )
 
     app.state.numislens_token = token
@@ -62,6 +69,10 @@ def create_app(
     @router.get("/health", tags=["meta"])
     def health() -> dict[str, str]:
         return {"status": "ok", "version": app.version}
+
+    @router.get("/openapi.json", include_in_schema=False)
+    def openapi_spec() -> dict:
+        return app.openapi()
 
     router.include_router(coins.router)
     router.include_router(locations.router)

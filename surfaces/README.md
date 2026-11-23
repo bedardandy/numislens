@@ -15,7 +15,7 @@ The Claude, ChatGPT, and Gemini instruction files teach the SAME operating subst
 
 ## The single integration artifact
 
-The daemon serves its OpenAPI JSON at `GET /api/v1/openapi.json` (interactive docs at `/api/v1/docs`). New surfaces are generated from that spec rather than hand-maintaining a parallel client. Authenticate with a bearer token in the `Authorization` header. The daemon binds localhost / Tailscale only and must never be port-forwarded raw; cloud assistants (ChatGPT, Gemini) reach it through a Tailscale Funnel (or Cloudflare tunnel) with a dedicated, independently-revocable token.
+The daemon serves its OpenAPI JSON at `GET /api/v1/openapi.json` (bearer token required, like every `/api/v1` path; the interactive Swagger/ReDoc pages are disabled). New surfaces are generated from that spec rather than hand-maintaining a parallel client. Authenticate with a bearer token in the `Authorization` header. The daemon binds localhost / Tailscale only and must never be port-forwarded raw; cloud assistants (ChatGPT, Gemini) reach it through a Tailscale Funnel (or Cloudflare tunnel) with a dedicated, independently-revocable token.
 
 ### Regenerate `openapi.json`
 
